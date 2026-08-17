@@ -1,0 +1,68 @@
+name: 🚀 Deploy website on push
+
+on:
+  push:
+    branches:
+      # 确保这是你正在使用的分支名称
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+# 同一分支上连推两次时取消上一次，别排队跑一堆过时的构建
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  web-deploy:
+    name: 🎉 Deploy
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout 🛎️
+        uses: actions/checkout@v7
+        with:
+          # 获取完整历史，供部署动作生成稳定提交
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      # **先构建再测试**，顺序不能反：tests/offlineAssets.test.mjs 里有一条查
+      # dist/sw.js 的 precache 断言，dist 不存在时它整条跳过。而 dist 在 .gitignore 里，
+      # CI 是全新 checkout——先测后建的话那条断言在 CI 上**从来没跑过**，
+      # 却看着是绿的（本地也一样：npm run verify 里 vitest 排在 vite build 前面，
+      # 查的是上一次构建留下的 sw.js）。
+      - name: Build website
+        run: npm run build
+
+      # 构建产物在手，测试才查得到 precache；同时它也是发布前的门禁，坏构建不发布。
+      #
+      # 这两步合起来**刻意不等于 `npm run verify`**：verify 比它们多一步
+      # `node scripts/subset-font.mjs`，而那一步在 CI 上是纯负担——要额外装 Python 的
+      # fonttools（pyftsubset）、要下 24MB 的 Noto Serif SC 原字体，而且它会**重新生成**
+      # 已提交的 public/fonts/ShenxianSerif.woff2，于是 CI 里凭空多出一个 diff。
+      # 而"忘了重跑子集脚本"本来就有人守：tests/font-coverage.test.mjs 核对的正是
+      # "已提交的子集有没有覆盖当前源码会渲染的字符"，这一步 Test 已经能抓到。
+      # 本机提交前照旧跑完整的 `npm run verify`。
+      - name: Test
+        run: npm run test
+
+      - name: Deploy
+        uses: JamesIves/github-pages-deploy-action@v4
+        with:
+          # 这是站点部署到的分支名称。gh-pages 只当静态产物的存放处，
+          # 对外由 EdgeOne 拉这个分支来发布
+          branch: gh-pages
+          # Vite 构建产物目录
+          folder: dist
+          # 不转发 head commit message——任意提交正文中的 shell 元字符
+          # （引号、$、!、反引号）会破坏动作内部的 git commit -m 调用；
+          # 动作默认的静态提交信息足矣，规范历史保留在 main。

@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+    <!-- theme-color 与 background_color 统一取 palette.ts 的夜色 #0E141C；
+         此前是 #0b0b12，和游戏里任何一处都对不上，安卓的地址栏与启动图会闪一下别的黑 -->
+    <meta name="theme-color" content="#0E141C" />
+    <link rel="icon" href="/icon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <title>神仙打架 — 东方神话街机格斗</title>
+    <meta name="description" content="十二位神仙，谁也不肯先收手。六关连战、对手每趟不同、离线可玩的横屏格斗。" />
+    <!-- og:* 这几条**必须写绝对 URL**，而且是这一页里唯一不能相对的地方：
+         vite 的 base 是 './'（同一份 gh-pages 产物既由 EdgeOne 挂在根域、又被 GitHub Pages
+         挂在子路径，见 vite.config.ts），它会把 content="/og.png" 重写成 "./og.png"——
+         而抓取方（微信/X/Facebook）对相对 og:image 的解析各家不一，卡片很可能就没图。
+         写成 https:// 开头 vite 一个字都不动，原样进产物。 -->
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://fight.newzone.top/" />
+    <meta property="og:title" content="神仙打架" />
+    <meta property="og:description" content="十二位神仙，谁也不肯先收手。六关连战 · 对手每趟不同 · 离线可玩" />
+    <meta property="og:image" content="https://fight.newzone.top/og.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="一枚被打裂的朱砂方章，印面刻着「神仙打架」" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:image" content="https://fight.newzone.top/og.png" />
+    <style>
+      /* Task 25：自带宋体子集——之前整套栈是 'Songti SC'/'SimSun'/'Noto Serif CJK SC'，
+         三个都是桌面系统字体名，Android 上全部落空，中文回退到黑体，竖排招式名/朱砂印/
+         关卡横幅这套"古籍宋体"排印在最大的目标平台上根本没生效。woff2-variations 的格式
+         提示给旧版 Safari，同一个文件再用 woff2 兜底给其余浏览器。 */
+      @font-face {
+        font-family: 'ShenxianSerif';
+        src: url('/fonts/ShenxianSerif.woff2') format('woff2-variations'),
+             url('/fonts/ShenxianSerif.woff2') format('woff2');
+        font-weight: 200 900;
+        font-style: normal;
+        font-display: swap;
+      }
+      html,body,#root{margin:0;height:100%;overflow:hidden;background:#0E141C;touch-action:none}
+      /* 焦点环：offset 把环推到元素外沿的深色页面底（#0E141C）上，而不是叠在卡片色块
+         内部——四张卡（朱砂红/赭金/石青蓝/褐棕）色相差异很大，环若压在色块上得逐色调调
+         对比度；挪到统一的深色背景上，一个藤黄环对四张卡都稳定可见，不用分色处理。
+         :focus-visible 只在键盘/程序聚焦时点亮，鼠标点击不触发，指针操作视觉不受影响。
+         选择器从「.char-card,.sx-seal,.sx-ghost」放宽到所有 button：按类名点名的写法漏了
+         三类控件——静音键、标题页的难度三档、陪练场的挡位/对手片，它们都没有类名，
+         于是拿到的是 UA 默认的 `1px auto rgb(16,16,16)`，在 #0E141C 上实测等于没有。
+         这正是这条规则当初要解决的问题，只是当时按类名列举，新控件加进来不会自动被覆盖。 */
+      button:focus-visible{outline:3px solid #D9A441;outline-offset:4px}
+      /* 陪练场那排小片（挡位 / 对手 / 退出）实测只有 24px 高、退出那颗 19px——拇指按不准。
+         而它们所在的那块控件带在 568x320 上已经占到 y=191，靠加内边距长高会把人物头顶盖住。
+         所以把**触摸目标**单独撑开：伪元素上下各外扩 5px，热区变成 34/29px，
+         布局高度一点不变（伪元素是绝对定位的，不参与排版）。 */
+      .sx-chip{position:relative}
+      .sx-chip::before{content:"";position:absolute;left:0;right:0;top:-5px;bottom:-5px}
+      /* 「下面还有」：操作页说明区在窄屏上把一半内容藏在折线以下，而手机上的滚动条是
+         overlay 的，静止时一条都看不见。底边渐隐当记号，由 screens.tsx 的 helpPaneRef
+         按滚动位置挂/摘这个类——滚到底就摘掉，免得把最后一行也吃掉半截。 */
+      .sx-more{-webkit-mask-image:linear-gradient(#000 calc(100% - 26px),transparent);
+               mask-image:linear-gradient(#000 calc(100% - 26px),transparent)}
+      /* 指针反馈：印章按下去像真盖章（下沉、印色加深），幽灵键只把细线提亮 */
+      .sx-seal{transition:transform .12s ease,filter .12s ease}
+      .sx-seal:hover{filter:brightness(1.12)}
+      .sx-seal:active{transform:translateY(1px);filter:brightness(.92)}
+      .sx-ghost{transition:color .12s ease,border-color .12s ease}
+      .sx-ghost:hover{color:#EDE3D2;border-color:rgba(237,227,210,.5)}
+      .char-card{transition:background .14s ease,border-color .14s ease}
+      .char-card:hover{border-color:rgba(237,227,210,.55)}
+      /* 竖屏挡板里的手机轮廓：转四分之一圈演示要横过来 */
+      .sx-rotate{animation:sx-turn 2.6s ease-in-out infinite}
+      @keyframes sx-turn{
+        0%,28%{transform:rotate(0deg)}
+        48%,78%{transform:rotate(-90deg)}
+        100%{transform:rotate(0deg)}
+      }
+      @media (prefers-reduced-motion:reduce){
+        .sx-rotate{animation:none;transform:rotate(-90deg)}
+        .sx-seal,.sx-ghost,.char-card{transition:none}
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
