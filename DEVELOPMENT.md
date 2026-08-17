@@ -842,3 +842,25 @@ node scripts/subset-font.mjs   # 需要 fonttools（pyftsubset），构建期工
 命中与 KO 这两个时刻换成了真实采样，取自 [Kenney](https://kenney.nl) 的 `Impact Sounds`
 素材包（CC0，公有领域），来源与 sha256 见 `public/sfx/SOURCE.md`；采样加载失败或离线时会
 自动回退回合成音，不会静音。
+
+## 部署
+
+gh-pages 分支只当静态产物的存放处，对外由 EdgeOne Pages 拉这个分支发布（见
+`.github/workflows/deploy.yml`）。
+
+### `edgeone.json` 里兜底那条必须排第一
+
+`public/edgeone.json` 的 `headers` 数组**看起来**是「先具体后兜底」的写法，实际上 EdgeOne
+取的是**最后一条命中**的规则。把 `/*` 放在末尾时，它会盖掉前面每一条：`/assets/*` 的
+`max-age=31536000, immutable` 和 `/fonts/*` 的同款一条都没生效，449KB 的 bundle 加 344KB
+字体每次进站都在回源验证，本该缓一年。
+
+所以顺序是**反的**：`/*` 在最前面当垫底值，具体规则排在它后面去覆盖它。别按字母序或者
+「从宽到窄」重排这个数组。
+
+这条坏得没有任何症状——站点功能全对、控制台干净，只有 `curl -sSI` 看响应头才发现：
+
+```bash
+curl -sSI https://fight.newzone.top/assets/index-<hash>.js | grep -i cache-control
+# 期望 public, max-age=31536000, immutable；若回 no-cache 就是又被兜底那条盖了
+```
