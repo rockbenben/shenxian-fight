@@ -94,6 +94,45 @@ export function MuteButton({ top = 12, right = 12, style }: { top?: number; righ
   );
 }
 
+/** 回源码的入口。只挂标题页——它是「看一眼这东西怎么做的」，不是打的时候要用的东西。
+ *
+ * 固定在右下角，不排进右栏：320px 高的横屏里**竖向是稀缺的那根轴**，右栏已经有五行
+ * （副标题/按钮/卖点/难度/记录），再加一行会把难度档和记录一起往下推。固定定位不占流。
+ * 右上是静音键，这颗放右下，同一条边、同一组 12px 偏移，两颗对称。
+ *
+ * **用标识而不是文字。** 第一版写的是文字 `GitHub`，实测 568x320 上盒子只有 59x26——
+ * 全站最矮的一颗（其余最低 32/34），得靠 sx-chip 外扩才够按；而且那行字在夜景上淡到
+ * 几乎看不见（截图上一眼就看得出来）。换成 40x40 的标识框之后：与静音键同形同尺寸、
+ * 右上右下两颗对称，热区天然够，也不再有任何文字——不挑语言，也不占字体子集。
+ *
+ * 这跟本项目「静音键从 🔇 换成「音」/「静」，因为表情符号是另一套视觉语言」那条不冲突：
+ * 那条针对的是**彩色表情字体**，而 octocat 是单色矢量的品牌标识，且没有汉字对应形。 */
+function SourceLink() {
+  return (
+    <a
+      href="https://github.com/rockbenben/shenxian-fight"
+      target="_blank"
+      rel="noopener noreferrer"
+      aria-label="在 GitHub 上查看源码"
+      title="在 GitHub 上查看源码"
+      style={{
+        position: 'fixed',
+        bottom: 'calc(12px + env(safe-area-inset-bottom, 0px))',
+        right: 'calc(12px + env(safe-area-inset-right, 0px))',
+        // 与 MuteButton 同一组值：40x40、1px 细线、同一层夜色底。两颗一上一下，成对
+        width: 40, height: 40, boxSizing: 'border-box',
+        display: 'grid', placeItems: 'center',
+        background: 'rgba(14,20,28,.55)', color: T.faint,
+        border: `1px solid ${T.hair}`,
+      }}
+    >
+      <svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true" focusable="false">
+        <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8z" />
+      </svg>
+    </a>
+  );
+}
+
 export function Title({ onStart, onTraining, onHelp, record, diff = DEFAULT_DIFFICULTY, onDiff }: {
   onStart: () => void; onTraining: () => void; onHelp: () => void;
   /** 闯关记录那一行；没有记录时传空串，这一行就不渲染 */
@@ -105,6 +144,7 @@ export function Title({ onStart, onTraining, onHelp, record, diff = DEFAULT_DIFF
   return (
     <div style={S.full}>
       <MuteButton />
+      <SourceLink />
       {/* 横屏是宽而矮的：标题竖排放左、行动放右，各占一半，标题因此能给到足够字号；
           原来是竖向堆叠，在 320px 高的横屏手机上挤成一团 */}
       <div style={{
@@ -561,15 +601,33 @@ export function TrainingBar({ mode, onPick, foeId, onFoe, onExit }: {
           窄屏那一侧现在由 LEFT_OF_CLUSTER 那条带子管（568x320 实测带宽 308px，这一行被压到 308），
           所以 520 只在**宽屏**才吃紧——932x430 实测带宽 672、这一行正好停在 520。
           两个约束各管一头，都不能删：带子管"别压到按键"，520 管"别摊成一条太长的横排"。 */}
-      <div style={{
-        display: 'flex', gap: 4, flexWrap: 'wrap', justifyContent: 'center',
-        maxWidth: 'min(520px, calc(100vw - 48px))',
-      }}>
-        {CHARACTERS.map(c => (
-          <button key={c.id} className="sx-chip" onClick={() => onFoe(c.id)} aria-pressed={c.id === foeId}
-            aria-label={`陪练对手换成${c.name}`} style={chip(c.id === foeId)}>{c.name}</button>
-        ))}
-      </div>
+      {/* 折起来。名册从四人涨到十二人之后，这一行在 568x320 上折成**三行**，整条从
+          y=168 长到 191——而木桩跳到峰值时头顶在屏幕 y≈150（跳高 46 逻辑单位，
+          FLOOR_Y 460、身高约 160、LOGIC_H 540 映射到 320）。也就是说**「跳入」这一挡
+          唯一要看的东西被自己的挡位条挡住了 41px**：那一挡就是练对空的，看不见来人
+          就没得练。上面那句「再长就盖到人物头顶」是四人时代写的，当时它还是对的。
+          用原生 <details> 而不是 useState：`tests/training.test.ts` 把 TrainingBar 当纯函数
+          调用，组件里一旦有 hook 那几条断言当场全红（Select 上记过同一条）。
+          顺带 <details> 本来就带键盘可达与展开语义，比自己搭一套省事。 */}
+      <details
+        style={{ maxWidth: 'min(520px, calc(100vw - 48px))' }}
+        onClick={e => {
+          // 点中某个对手就收起来：练的时候不该一直摊着三行。用 DOM 直接关，
+          // 不引入 React 状态（理由同上）。点 summary 本身交给浏览器的默认行为。
+          const t = e.target as HTMLElement;
+          if (t.closest('button')) (e.currentTarget as HTMLDetailsElement).open = false;
+        }}
+      >
+        <summary style={{ ...chip(false), listStyle: 'none', display: 'inline-block', userSelect: 'none' }}>
+          换对手：{CHARACTERS.find(c => c.id === foeId)?.name ?? '—'}
+        </summary>
+        <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', justifyContent: 'center', paddingTop: 4 }}>
+          {CHARACTERS.map(c => (
+            <button key={c.id} className="sx-chip" onClick={() => onFoe(c.id)} aria-pressed={c.id === foeId}
+              aria-label={`陪练对手换成${c.name}`} style={chip(c.id === foeId)}>{c.name}</button>
+          ))}
+        </div>
+      </details>
       {/* 出口跟挡位说明并排放在最后一行，不另起一行也不做成独立的固定元素：
           做成固定元素时它和这块控件带抢同一块地方（两者都从左沿 10px 起算，实测撞在一起），
           自己另起一行又要多吃约 28px——568x320 上这块已经压到 y=168，再长就盖到人物头顶。
@@ -797,7 +855,11 @@ export function Select({ onPick, onBack, training, cleared = [], pick = 0, onFoc
                 </span>
               ))}
             </span>
-            <Seal label={training ? '进陪练场' : '就是他'} onClick={() => onPick(cur)} />
+            {/* 「就是他」写死了男性代词，而名册里铁扇公主、白骨精是女性——十二人里两位，
+                每六次选人就有一次把人叫错。不去加一个性别字段来分「他/她」：那是为了
+                一颗按钮往角色数据里塞一个只有这里用得上的字段。
+                「出战」两个字既没有代词，又比「就是他」更直说按下去会发生什么。 */}
+            <Seal label={training ? '进陪练场' : '出战'} onClick={() => onPick(cur)} />
           </div>
         </div>
         <Ghost label="返回" onClick={onBack} />

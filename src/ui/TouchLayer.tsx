@@ -45,7 +45,10 @@ import { clearHeld, press, type Held } from './input';
  * 让它退到最远、也最小，换其余四颗宽敞，是这一组约束下最划算的分配。
  */
 export const BTN: { key: keyof Held; slot: MoveSlot | null; fallback: string; size: number; right: number; bottom: number }[] = [
-  { key: 'attack', slot: 'n1', fallback: '连击', size: 88, right: 14, bottom: 30 },
+  // 兜底名从「连击」改成「普攻」：教学文案早已统一叫「普攻」（见 DEVELOPMENT.md
+  // 「屏幕上一件东西只能有一个名字」），只有这颗键的兜底还留着第三个名字。
+  // 平时看不见——有 slot 的键面写的是角色招式名——但少一个名字总是好的。
+  { key: 'attack', slot: 'n1', fallback: '普攻', size: 88, right: 14, bottom: 30 },
   { key: 'block', slot: null, fallback: '防御', size: 76, right: 115, bottom: 14 },
   // slot 由摇杆方向决定，这里给 null，标签走 skillSlotFor + buttonView 的专门分支
   { key: 'skill1', slot: null, fallback: '技能', size: 76, right: 12, bottom: 140 },
@@ -250,7 +253,7 @@ export function hintFor(me: Fighter, frame = 0, training = false, foe?: Fighter)
   // 教学要落在**按得出来的那一刻**。判据直接用引擎那条闸门，不另写一份（同 CORNERED 的做法）
   if (foe && canTaunt(me.state, Math.abs(foe.x - me.x), foe.state,
     me.cooldowns[`${me.def.id}_taunt`] ?? 0) && foe.state === 'down') {
-    return '对手倒地　防御 + 上 = 挑衅，削他 10 气';
+    return '对手倒地　防御 + 上 = 挑衅，削 10 气';
   }
   // 另一半窗口：**隔着大半个场子**（canTaunt 的 gap > TAUNT_SAFE 那一支）。
   // 此前只教倒地那一种，而那一种恰恰是**要赌的**——挑衅 47 帧、倒地才 52 帧，
@@ -259,7 +262,7 @@ export function hintFor(me: Fighter, frame = 0, training = false, foe?: Fighter)
   // AI 现在也只在这个距离上挑衅，玩家看得见、也该学得到同一手。
   if (foe && foe.state !== 'down'
     && canTaunt(me.state, Math.abs(foe.x - me.x), foe.state, me.cooldowns[`${me.def.id}_taunt`] ?? 0)) {
-    return '离得远够不着　防御 + 上 = 挑衅，白削他 10 气';
+    return '离得远够不着　防御 + 上 = 挑衅，白削 10 气';
   }
   if (!training && frame < ROUND_OPEN && me.meter >= CARRY_WORTH && me.state !== 'attack') {
     return `上一回合攒下的 ${me.meter} 气带过来了 · 满 100 可放超必杀`;

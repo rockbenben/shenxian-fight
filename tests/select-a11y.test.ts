@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { Select } from '../src/ui/screens';
+import { Seal, Select } from '../src/ui/screens';
 import { CHARACTERS } from '../src/data/characters';
 
 // Task：选人页四张角色卡曾经是纯 <div onClick>，键盘用户 Tab 不到、Enter/Space 按不动——
@@ -104,7 +104,10 @@ test('点卡是选中，按印章才进场', () => {
   for (let i = 0; i < CHARACTERS.length; i++) {
     const picked: string[] = [];
     const t = Select({ onPick: c => picked.push(c.id), onBack: () => {}, pick: i });
-    const seals = find2(t).filter(e => e.props?.label === '就是他' || e.props?.label === '进陪练场');
+    // 按**类型**找那颗印，不按标签文字找：文案改一次这条就得跟着改一次
+    //（「就是他」改成「出战」时它就红过一回——铁扇公主、白骨精是女性，写死男性代词
+    // 每六次选人错一次）。这一页只有一颗 Seal，钉「它是不是那颗印」比钉它写什么稳。
+    const seals = find2(t).filter(e => e.type === Seal);
     expect(seals.length, '找不到确定印').toBe(1);
     (seals[0].props!.onClick as () => void)();
     expect(picked, `选中第 ${i} 个，印章交出去的却不是他`).toEqual([CHARACTERS[i].id]);
