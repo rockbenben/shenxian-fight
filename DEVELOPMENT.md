@@ -848,19 +848,28 @@ node scripts/subset-font.mjs   # 需要 fonttools（pyftsubset），构建期工
 gh-pages 分支只当静态产物的存放处，对外由 EdgeOne Pages 拉这个分支发布（见
 `.github/workflows/deploy.yml`）。
 
-### `edgeone.json` 里兜底那条必须排第一
+### `edgeone.json` 里除 `/*` 以外的规则一条都没生效（**已量，未修**）
 
-`public/edgeone.json` 的 `headers` 数组**看起来**是「先具体后兜底」的写法，实际上 EdgeOne
-取的是**最后一条命中**的规则。把 `/*` 放在末尾时，它会盖掉前面每一条：`/assets/*` 的
-`max-age=31536000, immutable` 和 `/fonts/*` 的同款一条都没生效，449KB 的 bundle 加 344KB
-字体每次进站都在回源验证，本该缓一年。
-
-所以顺序是**反的**：`/*` 在最前面当垫底值，具体规则排在它后面去覆盖它。别按字母序或者
-「从宽到窄」重排这个数组。
-
-这条坏得没有任何症状——站点功能全对、控制台干净，只有 `curl -sSI` 看响应头才发现：
+线上实测：`/assets/*`、`/fonts/*`、`/chars/*`、`/sfx/*`、`/skel/*` 拿到的全是兜底那条
+`/*` 的 `no-cache, must-revalidate`。也就是说 449KB 的 bundle 加 344KB 字体每次进站都在
+回源验证，本该缓一年。
 
 ```bash
 curl -sSI https://fight.newzone.top/assets/index-<hash>.js | grep -i cache-control
-# 期望 public, max-age=31536000, immutable；若回 no-cache 就是又被兜底那条盖了
+# 期望 public, max-age=31536000, immutable；实际 no-cache, must-revalidate
 ```
+
+**排除掉的两条**（别再走一遍）：
+
+- **不是数组顺序。** 试过把 `/*` 挪到最前面当垫底值，部署后（`curl /edgeone.json` 确认
+  线上确实是新顺序）响应头一个字没变。`/*` 在头在尾都赢。
+- **不是 `/chars/*/*` 那条非法规则拖累的。** 官方文档写明 source 中最多一个 `*`，
+  `/chars/*/*` 两个，是该删；但 025-kuafu 的 `edgeone.json` 里没有任何多通配符规则，
+  它的 `/assets/*` 同样不生效——两个项目一样的症状。
+
+还没试的：给 `/assets/*` 加一个 `/*` 没有的 header 键（例如 `X-Test-Rule`）发一次，
+看它出不出现。出现就说明具体规则是命中的、只是 `Cache-Control` 被 `/*` 覆盖；不出现
+就说明具体规则压根没匹配上，得去查 source 的写法（文档说 `*` 是 URL 路径通配符不是
+文件系统 glob，可能不跨 `/`）。
+
+这条坏得没有任何症状——站点功能全对、控制台干净，只有看响应头才发现。
