@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" role="img" aria-label="神仙打架">
+  <!-- 一枚被打裂的朱砂方章。
+       形制照游戏里超必杀 KO 时盖下的那枚印（见 screens.tsx 的 Seal）：
+       **方章、不倒角、印面内缩一圈细边**——上一版是 rx=20 的圆角红方块，
+       圆角与那条规矩正好相反，等于图标和游戏里的印不是同一枚。
+       裂口是「打架」那两个字：庙堂的印被击中，两半错开，缝里透出夜色。
+       32px 下裂口读作一道高光，方仍然是方的。 -->
+  <defs>
+    <!-- 裂口两侧：折线不是直线，直线读作"切开"，折线才读作"崩裂" -->
+    <clipPath id="a">
+      <polygon points="0,0 100,0 100,26 58,44 66,70 40,100 0,100"/>
+    </clipPath>
+    <clipPath id="b">
+      <polygon points="100,26 100,100 40,100 66,70 58,44"/>
+    </clipPath>
+  </defs>
+  <g clip-path="url(#a)" transform="translate(-1.6,-1.6)">
+    <rect width="100" height="100" fill="#C8443C"/>
+    <rect x="7" y="7" width="86" height="86" fill="none" stroke="#EDE3D2" stroke-width="2.6" opacity=".9"/>
+    <text x="50" y="72" font-size="58" text-anchor="middle" fill="#EDE3D2"
+          font-family="Noto Serif SC, Songti SC, SimSun, serif" font-weight="600">神</text>
+  </g>
+  <g clip-path="url(#b)" transform="translate(1.6,1.6)">
+    <rect width="100" height="100" fill="#C8443C"/>
+    <rect x="7" y="7" width="86" height="86" fill="none" stroke="#EDE3D2" stroke-width="2.6" opacity=".9"/>
+    <text x="50" y="72" font-size="58" text-anchor="middle" fill="#EDE3D2"
+          font-family="Noto Serif SC, Songti SC, SimSun, serif" font-weight="600">神</text>
+  </g>
+  <!-- 撞击点的一点藤黄：整枚印只有这一处不是朱砂，视线自然落到裂口上 -->
+  <circle cx="60" cy="46" r="3.4" fill="#D9A441"/>
+</svg>
