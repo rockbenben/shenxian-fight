@@ -48,12 +48,25 @@
          于是拿到的是 UA 默认的 `1px auto rgb(16,16,16)`，在 #0E141C 上实测等于没有。
          这正是这条规则当初要解决的问题，只是当时按类名列举，新控件加进来不会自动被覆盖。 */
       button:focus-visible{outline:3px solid #D9A441;outline-offset:4px}
-      /* 陪练场那排小片（挡位 / 对手 / 退出）实测只有 24px 高、退出那颗 19px——拇指按不准。
+      /* 陪练场那排小片（挡位 / 对手 / 退出）实测只有 24px 高、退出那颗 20px——拇指按不准。
          而它们所在的那块控件带在 568x320 上已经占到 y=191，靠加内边距长高会把人物头顶盖住。
-         所以把**触摸目标**单独撑开：伪元素上下各外扩 5px，热区变成 34/29px，
-         布局高度一点不变（伪元素是绝对定位的，不参与排版）。 */
+         所以把**触摸目标**单独撑开：伪元素上下各外扩 6px（原来 5px，撑完仍只有 35，
+         够不到本仓给静音键定的 40px 下限），布局高度一点不变（伪元素是绝对定位的，不参与排版）。 */
       .sx-chip{position:relative}
-      .sx-chip::before{content:"";position:absolute;left:0;right:0;top:-5px;bottom:-5px}
+      .sx-chip::before{content:"";position:absolute;left:0;right:0;top:-6px;bottom:-6px}
+      /* 细下划线键（训练场/操作说明/返回/回主页）实测 32-33px 高，是全站第二小的一族。
+         它们所在的行左右都空着，所以同样只撑热区不长高：上下各 6px、左右各 4px。 */
+      .sx-ghost{position:relative}
+      .sx-ghost::before{content:"";position:absolute;left:-4px;right:-4px;top:-6px;bottom:-6px}
+      /* 属性条的口径那一行：只在放得下的屏上说。568x320（横屏 SE）上这一屏已经顶到
+         底边，多一行就要把出口挤出屏幕——宁可少一句说明，也不能少一颗按钮。 */
+      .sx-scope{display:none}
+      @media (min-height:360px){.sx-scope{display:block}}
+      /* 触控键的按下反馈。此前五颗键按下去与静止是同一张脸：样式全在 React 内联里，
+         CSS 选不到它们，于是先给类名（.sx-btn），再压过内联——内联权重高于样式表，
+         描边这一项必须 !important。底色不动：冷却中它是 conic-gradient，压平就丢掉扇形了。 */
+      .sx-btn{transition:transform .08s ease,border-color .08s ease}
+      .sx-btn:active{transform:translateY(1px) scale(.97);border-color:rgba(237,227,210,.55) !important}
       /* 「下面还有」：操作页说明区在窄屏上把一半内容藏在折线以下，而手机上的滚动条是
          overlay 的，静止时一条都看不见。底边渐隐当记号，由 screens.tsx 的 helpPaneRef
          按滚动位置挂/摘这个类——滚到底就摘掉，免得把最后一行也吃掉半截。 */
@@ -76,10 +89,10 @@
       }
       @media (prefers-reduced-motion:reduce){
         .sx-rotate{animation:none;transform:rotate(-90deg)}
-        .sx-seal,.sx-ghost,.char-card{transition:none}
+        .sx-seal,.sx-ghost,.char-card,.sx-btn{transition:none}
       }
     </style>
-    <script type="module" crossorigin src="./assets/index-CXua_ST5.js"></script>
+    <script type="module" crossorigin src="./assets/index-sQA_KGLc.js"></script>
   <link rel="manifest" href="./manifest.webmanifest"><script id="vite-plugin-pwa:register-sw" src="./registerSW.js"></script></head>
   <body>
     <div id="root"></div>
