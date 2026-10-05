@@ -43,10 +43,10 @@ test('站防挡真的挡得住上段、挡不住下段——这一挡是用来�
   expect(res['n2 下段'], '站防挡住了下段，那这一挡就练不了扫堂').toBe(false);
 });
 
-test('蹲防挡挡得住下段、挡不住跳跃攻击——这一挡是用来练中段的', () => {
+test('蹲防挡挡得住下段、挡不住跳跃攻击——这一挡是用来练跳跃攻击的', () => {
   const c = CHARACTERS[0];
   const res: Record<string, boolean | null> = {};
-  for (const [name, slot] of [['n2 下段', 'n2'], ['jA 中段', 'jA']] as const) {
+  for (const [name, slot] of [['n2 下段', 'n2'], ['jA 跳跃攻击', 'jA']] as const) {
     const b = new Battle(structuredClone(c), structuredClone(c));
     b.p2.x = b.p1.x + 60;
     let blocked: boolean | null = null;
@@ -60,7 +60,7 @@ test('蹲防挡挡得住下段、挡不住跳跃攻击——这一挡是用来�
     res[name] = blocked;
   }
   expect(res['n2 下段'], '蹲防没挡住下段').toBe(true);
-  expect(res['jA 中段'], '蹲防挡住了跳跃攻击，那这一挡就练不了中段').toBe(false);
+  expect(res['jA 跳跃攻击'], '蹲防挡住了跳跃攻击，那这一挡就练不了跳跃攻击').toBe(false);
 });
 
 
@@ -111,7 +111,7 @@ test('挡位条里带着回主页的出口，并且整块让开了右下角按�
     mode: 'idle', onPick: () => {}, foeId: CHARACTERS[0].id, onFoe: () => {},
     onExit: () => { exited = true; },
   });
-  const exit = find(bar, e => e.props?.label === '退出训练场');
+  const exit = find(bar, e => e.props?.label === '退出陪练场');
   expect(exit.length, '挡位条里找不到出口——全屏 PWA 出不去陪练场').toBe(1);
   (exit[0].props?.onClick as (() => void))();
   expect(exited, '出口按下去没有回主页').toBe(true);

@@ -133,7 +133,7 @@ export function skillSlotFor(dir: { left: boolean; right: boolean; crouch: boole
 }
 
 /** 招式名压到按钮上：取间隔号前的一段，仍超过 4 字再取前 3。
- * 「风火轮·升龙」→风火轮、「筋斗云突袭」→筋斗云、「哮天犬突袭」→哮天犬——每一个都还是
+ * 「风火轮·拔地升龙」→风火轮、「筋斗云·十万八千」→筋斗云、「哮天犬·咬住别动」→哮天犬——每一个都还是
  * 一件看得懂的东西。原来这三颗键叫「技1/技2/技3」，是按引擎的槽位序号命名的，玩家没有
  * 任何办法知道按下去会发生什么，而招式名在数据里一直现成躺着。 */
 export function shortName(full: string): string {
@@ -150,21 +150,23 @@ export function buttonView(
   /** 技能键专用：当前摇杆方向选中的那一招。按下去会出什么，键面上就写什么——
    * 三合一之后这个反馈是必须的，否则玩家按之前不知道自己选中了哪一招 */
   skillSlot?: MoveSlot,
-): { label: string; cooling: number; tone: string | null; ready: boolean } {
+): { label: string; cooling: number; tone: string | null; ready: boolean; coolSec: number } {
   if (b.key === 'skill1' && skillSlot) return buttonView({ ...b, slot: skillSlot }, f);
   if (b.key === 'super') {
     // 大招键其实是两招。此前只有边框颜色在银/金之间变，没有任何文字说明按下去放的是哪一档
-    if (f.meter >= 100) return { label: '超必杀', cooling: 0, tone: T.tenghuang, ready: true };
-    if (f.meter >= 50) return { label: '奥义', cooling: 0, tone: '#C9CEE0', ready: true };
-    return { label: '大招', cooling: 0, tone: null, ready: false };
+    if (f.meter >= 100) return { label: '超必杀', cooling: 0, tone: T.tenghuang, ready: true, coolSec: 0 };
+    if (f.meter >= 50) return { label: '奥义', cooling: 0, tone: '#C9CEE0', ready: true, coolSec: 0 };
+    // 气不够：S-4。此前只差字色 .74/1.0 与描边 .12/.22，五颗并排看不出哪颗是空的
+    return { label: '大招', cooling: 0, tone: null, ready: false, coolSec: 0 };
   }
   const mv = b.slot ? f.def.moves[b.slot] : null;
-  if (!mv) return { label: b.fallback, cooling: 0, tone: null, ready: true };
+  if (!mv) return { label: b.fallback, cooling: 0, tone: null, ready: true, coolSec: 0 };
   // cooldowns 里存的是剩余帧，引擎每逻辑帧递减。之前按钮对冷却毫无表示，按下去没反应
   // 也不知道为什么——这是这版交互里代价最低、收益最大的一处补齐。
   const left = mv.cooldown > 0 ? (f.cooldowns[mv.id] ?? 0) : 0;
   const cooling = left > 0 ? Math.min(left / mv.cooldown, 1) : 0;
-  return { label: shortName(mv.name), cooling, tone: null, ready: cooling === 0 };
+  // 剩余秒数与扇形读的是同一个 left：冷却的推进在 battle.tick 的固定 1/60s 逻辑帧里
+  return { label: shortName(mv.name), cooling, tone: null, ready: cooling === 0, coolSec: left / 60 };
 }
 
 /** 触屏提示条：跑/回避/受身/蓄气这些系统全在引擎里，手机上没有任何线索能发现它们。
@@ -183,10 +185,12 @@ export function buttonView(
 export const IDLE_TIPS = [
   '双击前进 = 跑　双击后退 = 后跳',
   '防御 + 下 = 蹲防　站防才挡跳跃攻击',
-  '连击第二段是下段扫堂，站防挡不住',
+  // 那颗键的兜底名上一轮刚从「连击」统一成「普攻」（屏幕上一件东西只能有一个名字），
+  // 这三条当时漏了——同一招在轮播里叫「连击第二段」、在帮助页叫「普攻第二段」
+  '普攻第二段是下段扫堂，站防挡不住',
   '普攻命中后再按一下接下一段，按技能／大招取消',
-  '防御 + 大招 = 蓄气　50 气爆气顶开',
-  '吹飞 = 必倒且不能受身　打空了收招很久',
+  '防御 + 大招 = 蓄气　够 50 气爆开顶人',
+  '吹飞 = 必倒且不能受身　打空了收势很久',
   '轻点上 = 小跳　按住 = 大跳',
   '贴身按普攻 = 投技　挡不住，但可挣脱',
 ];
@@ -220,10 +224,10 @@ export function hintFor(me: Fighter, frame = 0, training = false, foe?: Fighter)
     // 「不能受身」的三种来源里只有投技留了出路：被抓住前的一瞬新按普攻就能挣脱
     //（escapeAge，12 帧窗口）。混进"只能躺满"那一句里，等于把唯一的出路也说成没有。
     // 实测被投 4.0 次/回合、挣脱只有 0.4 次——玩家在对局里根本不知道有这条路。
-    if (me.downByThrow) return '被投了　被抓住前的一瞬新按 普攻 能挣脱（按住不放无效）';
+    if (me.downByThrow) return '被投了　被抓住前的一瞬立刻再按 普攻 能挣脱（按住不放无效）';
     if (!me.techable) return '大招 / 吹飞 打倒的不能受身，只能躺满';
     if (me.stateFrame <= TECH_WINDOW) return '快按 普攻 或 防御 —— 受身起身';
-    return '刚才那一下可以受身：倒地的那一瞬新按一次 普攻 或 防御';
+    return '刚才那一下可以受身：倒地的那一瞬立刻再按一次 普攻 或 防御';
   }
   // 防御取消现在有两条出路，而触发这条提示的那一刻**两条都能走**。
   // 只讲顶开等于把回避那条藏起来了——按处境讲对应的那条，判据与 ai 用同一个 CORNERED
@@ -231,7 +235,7 @@ export function hintFor(me: Fighter, frame = 0, training = false, foe?: Fighter)
     const wall = me.x - ARENA_MIN < CORNERED || ARENA_MAX - me.x < CORNERED;
     return wall
       ? '被压在版边　防御取消·推方向 = 滚到背后（50 气）'
-      : '防御取消　按 普攻 = 顶开　推方向 = 滚到背后（50 气）';
+      : '防御取消　普攻 = 顶开　推方向 = 滚背后（50 气）';
   }
   // 被压在版边、而人正举着防御——**这才是被压制时最常见的姿势**。
   // 下面那条「被逼到版边」此前只认 idle/walk，于是最需要它的姿势恰好读不到：
@@ -267,8 +271,9 @@ export function hintFor(me: Fighter, frame = 0, training = false, foe?: Fighter)
   if (!training && frame < ROUND_OPEN && me.meter >= CARRY_WORTH && me.state !== 'attack') {
     return `上一回合攒下的 ${me.meter} 气带过来了 · 满 100 可放超必杀`;
   }
-  if (me.maxMode > 0) return 'MAX 状态 · 伤害提升';
-  if (!training && me.meter >= 100) return '气槽已满 · 连击第二段命中后按大招最赚';
+  // 屏上不再出现「MAX」这个英文词：帮助页、轮播、键面都叫它爆气，提示条不能叫第四个名字
+  if (me.maxMode > 0) return '爆气中 · 伤害提升';
+  if (!training && me.meter >= 100) return '气槽已满 · 普攻第二段命中后按大招最赚';
   // 贴墙时优先教回避：它是版边压制唯一的出口（能从对手身体里滚过去换到背后），
   // 而这一条只在真的被逼到墙角时才有意义，常驻反而挤掉别的提示
   if ((me.state === 'idle' || me.state === 'walk')
@@ -319,6 +324,17 @@ export function nextHint(cur: { text: string; left: number }, want: string):
   if (cur.left > 0 && !canCut) return { text: cur.text, left: cur.left - 1 };
   return { text: want, left: HINT_MIN_HOLD };
 }
+
+/**
+ * 这一回合是不是已经打完、正在演出（KO 慢镜 → 摆造型 → 台词）。
+ * 抽成纯函数：TouchLayer 本体带 hooks，脱离渲染器调用不了，而"演出期间键还吃不吃事件"
+ * 正是这一处改动的全部行为（同 buttonView / hintFor 的做法）。
+ *
+ * 之前这几秒里五颗键照常亮着、照常收事件，而输入缓冲会把这一下带进下一回合开头
+ *（input.ts 的 tap 锁存 + 先行入力）——屏上既没说"收到了"也没说"现在不行"。
+ */
+export const outroOf = (b: { winner: 0 | 1 | null; doubleKo: boolean; timeUp: boolean }): boolean =>
+  b.winner !== null || b.doubleKo || b.timeUp;
 
 function HintBar({ battle, training }: { battle: Battle; training?: boolean }) {
   // 最短停留按**逻辑帧**扣，不按重绘次数。
@@ -390,10 +406,17 @@ export function TouchLayer({ held, battle, training }: { held: Held; battle: Bat
   };
 
   const me = battle.p1;
+  const outro = outroOf(battle);
 
   return (
     <div
-      style={{ position: 'fixed', inset: 0, touchAction: 'none' }}
+      style={{
+        position: 'fixed', inset: 0, touchAction: 'none',
+        // 演出期间整层淡出且不吃事件：键还在（下一回合马上要用），但不再假装可打
+        opacity: outro ? 0.12 : 1,
+        pointerEvents: outro ? 'none' : 'auto',
+        transition: 'opacity .18s ease',
+      }}
       onPointerDown={e => {
         if (e.clientX < window.innerWidth / 2 && stickId.current === -1) {
           stickId.current = e.pointerId;
@@ -423,7 +446,7 @@ export function TouchLayer({ held, battle, training }: { held: Held; battle: Bat
         {BTN.map(b => {
           // 技能键的键面随摇杆方向实时变：推着下时写「风火轮」，松开写「烈焰突刺」
           const slot = b.key === 'skill1' ? skillSlotFor(held) : undefined;
-          const { label, cooling, tone, ready } = buttonView(b, me, slot);
+          const { label, cooling, tone, ready, coolSec } = buttonView(b, me, slot);
           // pointerup/leave/cancel 都要落回 false，否则中断的一次按下（来电、系统手势）会把
           // 标志卡在 true 上（block 永久格挡 / 其它键在下一 tick 因 prev 锁存而永久失灵）
           // 技能键按下的是三个标志之一，松手要三个一起清——按住时改推方向不换招
@@ -435,6 +458,9 @@ export function TouchLayer({ held, battle, training }: { held: Held; battle: Bat
           return (
             <div
               key={b.key}
+              // 类名是给 :active 用的（U-2）：样式全在内联里，CSS 选不到它们，
+              // 于是这颗键按下去与没按下去是同一张脸
+              className={ready ? 'sx-btn' : 'sx-btn sx-btn-off'}
               onPointerDown={e => {
                 e.stopPropagation();
                 press(held, b.key === 'skill1'
@@ -452,10 +478,13 @@ export function TouchLayer({ held, battle, training }: { held: Held; battle: Bat
                 boxSizing: 'border-box',
                 width: b.size, height: b.size, borderRadius: '50%',
                 // 冷却中的那一瓣压暗，随剩余帧收拢到零；从 -90deg 起扫，读法与钟面一致
+                // U-3：原来两段是 .62 暗 / .10 亮，压在夜色画布上几乎分不出来，
+                // 而它是"这颗键现在按不动"的唯一线索。暗扇压深、亮扇提到 hair 那一档
                 background: cooling > 0
-                  ? `conic-gradient(from -90deg, rgba(8,12,20,.62) 0turn ${cooling}turn, rgba(237,227,210,.10) ${cooling}turn 1turn)`
+                  ? `conic-gradient(from -90deg, rgba(4,8,14,.86) 0turn ${cooling}turn, rgba(237,227,210,.16) ${cooling}turn 1turn)`
                   : 'rgba(237,227,210,.10)',
-                border: `2px solid ${tone ?? (ready ? T.hair : 'rgba(237,227,210,.12)')}`,
+                // S-4：气不够的那颗改成虚线描边——五颗并排时一眼能扫出哪颗是空的
+                border: `2px ${ready ? 'solid' : 'dashed'} ${tone ?? (ready ? T.hair : 'rgba(237,227,210,.12)')}`,
                 boxShadow: tone ? `0 0 16px ${tone}` : 'none',
                 // 冷却中压暗但仍要认得出是哪一招：faint(.55) 叠在扇形暗色上实测读不清，
                 // 用 dim(.74)——比就绪态（paper）明显暗，又不至于看不见
@@ -466,11 +495,22 @@ export function TouchLayer({ held, battle, training }: { held: Held; battle: Bat
               }}
             >
               {/* 折行宽度按字数给，不是一律 2.4em。那个宽度是键还只有 60px 时定的，
-                  键涨到 76~88 之后仍然按两字一行折，三字招式（超必杀／一步扑／钉耙击）
+                  键涨到 76~88 之后仍然按两字一行折，三字招式（超必杀／一步扑／乾坤圈）
                   就全被劈成「超必 / 杀」——一屏五颗键，三颗是断开的，这是整块看着挤的主因。
                   14px × 3 字 ≈ 44px，88px 圆的内接方约 59px，三字本来就放得下。
-                  四字（如意金箍）仍然排 2×2：那才真的塞不进一行。 */}
+                  四字（如意金箍）仍然排 2×2：那才真的塞不进一行。
+                  招式名改版之后必杀的头基本都是四字，所以走 2×2 的键多了——这是有意留的，
+                  别再"修"回一行：四字成语天然在第二字后断开（横扫 / 千军、三昧 / 真火），
+                  读起来不别扭；真要塞进一行得把字号压到 12px 才进得了 76px 圆键的内接方，
+                  那比换行亏得多。逐个角色过过：没有一个头会在第二字处被劈断词。 */}
               <span style={{ width: label.length >= 4 ? '2.4em' : undefined, whiteSpace: label.length >= 4 ? undefined : 'nowrap' }}>{label}</span>
+              {/* 剩余秒数：扇形说的是"在转"，数字才说清"还要等多久"。读的是引擎帧数，
+                  与扇形同一个 left，不另立计时源 */}
+              {cooling > 0 && (
+                <span style={{ position: 'absolute', bottom: '18%', fontSize: 11, letterSpacing: 0, opacity: .85 }}>
+                  {coolSec >= 1 ? coolSec.toFixed(1) : Math.ceil(coolSec * 10) / 10}s
+                </span>
+              )}
             </div>
           );
         })}

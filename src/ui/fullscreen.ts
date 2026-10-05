@@ -17,14 +17,29 @@
 // - iPhone Safari 不实现元素全屏（只有 <video> 有非标准的 webkitEnterFullscreen），那里
 //   requestFullscreen 调用即报错、静默退回非全屏，属**预期行为**，不为它写兜底 hack——
 //   iOS 的全屏路径是「添加到主屏幕」，PWA manifest 已经是 display: 'fullscreen'。
-const isCoarsePointer = typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;
+/** 指针是"手指"还是"鼠标"。竖屏挡板拿它决定失败时该说什么话 */
+export const isCoarsePointer = typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;
 
-/** 挂在标题页「开始挑战」/「训练场」按钮的 onClick 里，与 unlockAudio() 同处一个同步调用栈。
- * 桌面端（isCoarsePointer=false）直接跳过，不打扰鼠标+键盘玩家。已在全屏内则空转。 */
-export function goFullscreen(): void {
-  if (!isCoarsePointer || document.fullscreenElement) return;
-  void document.documentElement.requestFullscreen?.().then(() => {
-    const so = screen.orientation as ScreenOrientation & { lock?: (o: 'landscape') => Promise<void> };
-    void so?.lock?.('landscape').catch(() => {});
-  }).catch(() => {});
+/** 现在真的是横屏了吗。锁没锁成不能只看 promise 有没有 resolve——
+ * iOS 的 orientation.lock 根本不存在（可选调用直接跳过），Safari 也不实现元素全屏 */
+const isLandscape = () => (screen.orientation?.type ?? '').startsWith('landscape');
+
+/** 挂在标题页「开始闯关」/「陪练场」按钮的 onClick 里，与 unlockAudio() 同处一个同步调用栈。
+ * 桌面端（isCoarsePointer=false）直接跳过，不打扰鼠标+键盘玩家。已在全屏内则空转。
+ *
+ * 返回"这一按之后是不是真的横过来了"。此前它什么都不回，两个 catch 把失败咽得干干净净——
+ * 于是竖屏挡板上那颗「仍要继续」按下去毫无反应（系统开了方向锁的人、iOS 上的 Safari），
+ * 而同一屏上那句「转过来就自动继续」此刻正是假的。调用方要用这个结果说一句可操作的话。 */
+export function goFullscreen(): Promise<boolean> {
+  if (!isCoarsePointer) return Promise.resolve(false);
+  const entered = document.fullscreenElement
+    ? Promise.resolve()
+    : (document.documentElement.requestFullscreen?.() ?? Promise.reject());
+  return Promise.resolve(entered)
+    .then(() => {
+      const so = screen.orientation as ScreenOrientation & { lock?: (o: 'landscape') => Promise<void> };
+      return so.lock?.('landscape') ?? Promise.resolve();
+    })
+    .catch(() => {})
+    .then(() => isLandscape());
 }

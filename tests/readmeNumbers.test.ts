@@ -32,8 +32,8 @@ if (!reacts.length) throw new Error('STAGES 里一个 ai.react 都没读到—�
 const CLAIMS: [string, string][] = [
   [`每回合 **${ROUND_TIME / 60} 秒**`, 'ROUND_TIME 回合时长'],
   [`掉到${CN[Math.round(DESPERATE_HP * 10)]}成以下`, 'DESPERATE_HP 残血阈值'],
-  [`记住 ${INPUT_BUFFER} 帧`, 'INPUT_BUFFER 先行输入窗口'],
-  [`伤害 ×${COUNTER_DMG}、硬直 +${COUNTER_STUN} 帧`, 'COUNTER_DMG / COUNTER_STUN 反击'],
+  [`记住 ${(INPUT_BUFFER / 60).toFixed(1)} 秒（${INPUT_BUFFER} 帧）`, 'INPUT_BUFFER 先行输入窗口'],
+  [`伤害 ×${COUNTER_DMG}、硬直多 ${(COUNTER_STUN / 60).toFixed(1)} 秒（${COUNTER_STUN} 帧）`, 'COUNTER_DMG / COUNTER_STUN 反击'],
   [`倒地 ${TECH_WINDOW} 帧内`, 'TECH_WINDOW 受身窗口'],
   [`${DOWN_STUN} 帧干等`, 'DOWN_STUN 倒地硬直'],
   [`被投前 ${THROW_ESCAPE_WINDOW} 帧内`, 'THROW_ESCAPE_WINDOW 投技解脱窗口'],

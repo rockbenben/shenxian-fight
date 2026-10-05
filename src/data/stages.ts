@@ -49,8 +49,11 @@ export const HOME: Record<string, { name: string; bg: StageBg }> = {
     name: '花果山',
     bg: { sky: ['#0e2a1a', '#4a8a5a'], ground: '#14301e', silhouette: '#0a2012', seed: 33, celestial: 'sun', celestialColor: '#D9A441', ambient: { kind: 'petal', color: '#ffd7e0', count: 30 } },
   },
+  // 积雷山·摩云洞：牛魔王的洞府本名。原来这条叫「积雷山·魔王真身」，
+  // 是 12 个关名里唯一一个"地名·非地名"，而且和它下面那行「对手 · 牛魔王」
+  // 把"魔王"说了两遍——"要现真身"这件事由超必杀名「真身巨牛」去说，关名只管地点。
   niumo: {
-    name: '积雷山·魔王真身',
+    name: '积雷山·摩云洞',
     bg: { sky: ['#1c0606', '#6a1e10'], ground: '#260c08', silhouette: '#140404', seed: 44, celestial: 'moon', celestialColor: '#C8443C', ambient: { kind: 'ember', color: '#ff7a3c', count: 40 } },
   },
   // 火云洞：洞口往外看的赤黑，火舌把岩壁烤成暗红。余烬最密——他本人就是一直在烧的
@@ -192,9 +195,10 @@ export const BOSS_DMG_SCALE = [1, 1, 1, 1.0];
  * 抽取是**纯函数**（种子 + 玩家角色 → 六关），不碰 Math.random：
  * 同一趟里刷新页面、重进关卡都必须是同一批对手，而且这件事要可回归。
  */
-const RUN_LEN = 6;
+/** 一趟几关。导出是给取景夹具夹 `?dp=result&stage=` 用的——它不能拿 STAGES.length，
+ * 那张表是四关时代留下的 AI 档位表，比阶梯短两级 */
+export const RUN_LEN = 6;
 export const FINAL_BOSS = 'niumo';
-
 /** 六档难度。react 逐关不降，这条次序不变量被破坏过两次，每次都在某个套路上开了洞。
  * 中间两档是从既有的 lv2/lv3 派生的：只动 react（它是难度的主要来源），
  * 权重表照抄——凭空写两张新表等于把四关调了几十轮的经验丢掉。 */

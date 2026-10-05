@@ -44,13 +44,13 @@ test('「贴身按普攻键自动改投」——贴身确实出投技，离远�
   expect(tryAt(THROW_RANGE + 40), '离得老远也改投了，说明「贴身」这个词是错的').toBe(false);
 });
 
-test('「出招键会记住 6 帧」——先行入力的窗口就是这个数', () => {
-  saysIt('出招键会记住 6 帧');
+test('「出招键会记住 0.1 秒（6 帧）」——先行入力的窗口就是这个数', () => {
+  saysIt('出招键会记住 0.1 秒（6 帧）');
   expect(INPUT_BUFFER, '帮助页写 6 帧，引擎不是 6').toBe(6);
 });
 
-test('「伤害 ×1.2、硬直 +6」——反击命中的两个数对得上', () => {
-  saysIt('伤害 ×1.2、硬直 +6');
+test('「伤害 ×1.2、硬直多 0.1 秒」——反击命中的两个数对得上', () => {
+  saysIt('伤害 ×1.2、硬直多 0.1 秒');
   expect(COUNTER_DMG).toBe(1.2);
   expect(COUNTER_STUN).toBe(6);
 });
@@ -85,8 +85,8 @@ test('「中段无敌，收尾没有」——回避的无敌确实只在中段',
     .toBeLessThanOrEqual(ROLL_INVULN_TO + 2);
 });
 
-test('「倒地瞬间新按普攻键或防御键」——按住不放无效，且硬直击倒受不了身', () => {
-  saysIt('倒地瞬间新按普攻键或防御键');
+test('「倒地瞬间立刻再按普攻键或防御键」——按住不放无效，且硬直击倒受不了身', () => {
+  saysIt('倒地瞬间立刻再按普攻键或防御键');
   expect(TECH_WINDOW).toBeGreaterThan(0);
   // 一直按着攻击键：不该自动受身
   const held = new Battle(structuredClone(CHARACTERS[0]), structuredClone(CHARACTERS[1]));
@@ -97,11 +97,11 @@ test('「倒地瞬间新按普攻键或防御键」——按住不放无效，�
     held.tick({ ...NULL_INPUT, attack: true }, { ...NULL_INPUT });
     if (held.events.some(e => e.type === 'tech')) techedWhileHeld = true;
   }
-  expect(techedWhileHeld, '一直按着也能受身——那「新按」两个字就是假的').toBe(false);
+  expect(techedWhileHeld, '一直按着也能受身——那「立刻再按」就是假的').toBe(false);
 });
 
-test('「被投前的一瞬新按普攻键（按住不放无效）」——解脱窗口存在且要边沿', () => {
-  saysIt('被投前的一瞬新按普攻键（按住不放无效）');
+test('「被投前的一瞬立刻再按普攻键（按住不放无效）」——解脱窗口存在且要边沿', () => {
+  saysIt('被投前的一瞬立刻再按普攻键（按住不放无效）');
   expect(THROW_ESCAPE_WINDOW).toBeGreaterThan(0);
 });
 
@@ -109,14 +109,21 @@ test('「被投前的一瞬新按普攻键（按住不放无效）」——解�
 // "是说明写错了"——他只会以为自己理解错了。所以帮助页写的每个字母都要真在映射表里，
 // 而且映射表里每个能用的键也都要在帮助页出现过（否则那个功能等于没有键盘入口）。
 
-/** 帮助页那三栏里出现的所有单字母按键。取「独立出现的大写字母」，避开中文与 J+L 这类组合里的字母 */
+/** 帮助页那三栏 + 栏末的键盘行里出现的所有单字母按键。
+ * 取「独立出现的大写字母」，避开中文与 J+L 这类组合里的字母。
+ * 范围从 `export function Help` 扫到下一个导出：键盘提示此前逐行挂在各条末尾，
+ * 现在收成栏末一行（8 行有、十几行没有，读起来像"有些系统键盘按不出来"），
+ * 只扫三栏正文就会漏掉那一行——而这两条断言要守的是"每个能用的键都写过"。 */
 function keysInHelp(): Set<string> {
-  const i = helpSrc.indexOf("['移动 / 蹲'");
-  const j = helpSrc.indexOf("['爆气 / MAX'");
+  const i = helpSrc.indexOf('export function Help');
+  const j = helpSrc.indexOf('export type DummyMode');
   expect(i, '帮助页的锚点找不到了').toBeGreaterThan(0);
   expect(j, '帮助页的锚点找不到了').toBeGreaterThan(i);
-  const body = helpSrc.slice(i, j + 400);
-  return new Set((body.match(/\b[A-Z]\b/g) ?? []));
+  const body = helpSrc.slice(i, j);
+  // 只要"独立出现"的大写字母：`T.paper`、`S.full` 这类令牌名不算键位，
+  // 所以字母前后都不能贴到点号或别的单词字符（旧版把范围限定在三栏正文里，
+  // 才没碰到这些名字；范围一放宽就得自己把它们筛掉）
+  return new Set((body.match(/(?<![.\w])[A-Z](?![.\w])/g) ?? []));
 }
 
 test('帮助页写的每个键都真在键盘映射里', () => {
@@ -144,15 +151,15 @@ test('帮助页说的每个动作，按它写的键真的能做出来', () => {
   const press = (keys: Partial<InputFrame>): InputFrame => ({ ...NULL_INPUT, ...keys });
   // 逐条：帮助页的说法 → 引擎该出现的状态
   const cases: [string, InputFrame, (b: Battle) => boolean, string][] = [
-    ['摇杆左右 / 下　键盘 A D / S', press({ crouch: true }), b => b.p1.state === 'crouch', '按 S 没有蹲下'],
-    ['防御键　推下=蹲防　键盘 L', press({ block: true }), b => b.p1.state === 'block', '按 L 没有进入防御'],
-    ['防御键　推下=蹲防　键盘 L', press({ block: true, crouch: true }), b => b.p1.lowGuard, '按 L+S 不是蹲防'],
+    ['摇杆左右 / 下', press({ crouch: true }), b => b.p1.state === 'crouch', '按 S 没有蹲下'],
+    ['防御键　推下=蹲防', press({ block: true }), b => b.p1.state === 'block', '按 L 没有进入防御'],
+    ['防御键　推下=蹲防', press({ block: true, crouch: true }), b => b.p1.lowGuard, '按 L+S 不是蹲防'],
     ['摇杆上　轻点=小跳', press({ jump: true }), b => b.p1.state === 'jump', '按 W 没有起跳'],
     // 这一条**走真正的输入层**：帮助页承诺的是"防御 + 左/右"这个手势，不是引擎内部的 roll 位。
     // 手写 roll:true 只能证明引擎认这一位，证明不了玩家按出来的东西会变成这一位
     ['防御 + 左/右', rollGesture(), b => b.p1.state === 'roll', '防+方向没有回避'],
-    ['H 或 J+L', press({ attack: true, block: true }), b => b.p1.move?.name === '吹飞攻击', 'J+L 没有出吹飞'],
-    ['H 或 J+L', press({ blowback: true }), b => b.p1.move?.name === '吹飞攻击', 'H 没有出吹飞'],
+    ['吹飞 H（或 J + L）', press({ attack: true, block: true }), b => b.p1.move?.name === '吹飞攻击', 'J+L 没有出吹飞'],
+    ['吹飞 H（或 J + L）', press({ blowback: true }), b => b.p1.move?.name === '吹飞攻击', 'H 没有出吹飞'],
   ];
   for (const [quote, input, ok, msg] of cases) {
     saysIt(quote);

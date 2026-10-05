@@ -59,7 +59,13 @@ const noFirst = (): FirstAtk => ({ on: false, who: 0, age: 0 });
 // 却只在结算页出现，而摆造型那 120 帧一个字都没有。
 // 落在造型定住之后（胜利动作 t≈52-66 收势），一直挂到收尾结束、结算页接手。
 const QUOTE_FADE_IN = 12;
-const QUOTE_Y = 196;        // 先制横幅在 150，错开一行
+// 先制横幅在 150，错开一行。y 不能再往上（会撞先制），所以让开右下按键簇这件事交给 x：
+// 见 drawWinQuote 里那句 0.55
+export const QUOTE_Y = 196;
+/** 台词的横向落点（逻辑宽的几分之几），按"说话那一方"取。
+ * 右边那一档是 0.55 而不是 0.70：0.70 在 568x320 上会从右下按键簇身上穿过去，
+ * 判据见 tests/touchLayout.test.ts 的几何那条 */
+export const WIN_QUOTE_X = [0.30, 0.55] as const;
 interface WinQuote { on: boolean; text: string; who: 0 | 1; age: number }
 const noQuote = (): WinQuote => ({ on: false, text: '', who: 0, age: 0 });
 
@@ -233,7 +239,11 @@ export class BannerSystem {
   private drawWinQuote(ctx: CanvasRenderingContext2D) {
     const q = this.quote;
     if (!q.on) return;
-    const x = q.who === 0 ? LOGIC_W * 0.30 : LOGIC_W * 0.70;
+    // 说话那一方的半场。但**右半场的下半是五颗触控键**：0.70 在 568x320 上映到屏幕 x≈398，
+    // 一行 8-9 字横跨 348..448，正好从「大招」键（390..470）身上穿过去——台词是回合末
+    // 唯一要说的一句话，被半透明的键与描边切成两截。往中轴收到 0.55：仍在对手那侧，
+    // 右沿退到 363，与按键簇留出 27px。判据钉在 tests/moveNames.test.ts 的几何那条
+    const x = LOGIC_W * WIN_QUOTE_X[q.who];
     ctx.save();
     ctx.globalAlpha = Math.min(1, q.age / QUOTE_FADE_IN);
     ctx.font = `19px ${SERIF}`;

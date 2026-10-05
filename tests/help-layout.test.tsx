@@ -57,7 +57,7 @@ test('「返回」在滚动区之外——说明再长也推不走它', () => {
 
 test('说明覆盖了这几轮加的系统——玩家找不到的系统等于不存在', () => {
   const all = textOf(tree) + find(tree, () => true).map(e => String(e.props?.label ?? '')).join('');
-  for (const k of ['蹲防', '连段取消', '反击命中', '爆气', '投技解脱', '下段扫堂']) {
+  for (const k of ['蹲防', '连段取消', '反击命中', '爆气', '投技解脱', '下段扫堂', '陪练场']) {
     expect(all.includes(k), `操作说明里没有「${k}」`).toBe(true);
   }
   // 三处曾经描述的是已经不存在的游戏，别再退回去

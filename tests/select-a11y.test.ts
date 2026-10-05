@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { Seal, Select } from '../src/ui/screens';
+import { Ghost, Seal, Select } from '../src/ui/screens';
 import { CHARACTERS } from '../src/data/characters';
 
 // Task：选人页四张角色卡曾经是纯 <div onClick>，键盘用户 Tab 不到、Enter/Space 按不动——
@@ -119,8 +119,7 @@ function find2(node: unknown, out: El[] = []): El[] {
   return out;
 }
 
-// 选人卡的名号是**竖排**的，高度余量按最长的名字算。这条断言守的是那个前提：
-// 卡面字号只分「三字及以下」和「四字」两档（见 screens.tsx 里那段注释），
+// 选人卡的名号是**竖排**的，高度余量按最长的名字算。这条断言守的是那个前提：// 卡面字号只分「三字及以下」和「四字」两档（见 screens.tsx 里那段注释），
 // 名册里冒出五个字的名字时，它会静默折成两列——而这个项目已经栽过两次
 //（通关印挤掉「二郎神」→「神二／郎」；四字的「铁扇公主」→「铁扇／公主」），
 // 两次都是单元测试全绿、打开浏览器才看见的。
@@ -130,3 +129,34 @@ test('没有角色的名号长到卡面排不下', () => {
       .toBeLessThanOrEqual(4);
   }
 });
+
+// 568x320（横屏 iPhone SE）上，「返回」曾经整颗被推到屏幕外：右列是
+// 名号 + 定位 + 特性 + 六条属性 + 四行招式 + 印章 + 返回，实测 top=322 而视口只有 320 高，
+// html/body 又是 overflow:hidden，滚不出来——这一屏唯一的出口看不见也按不到。
+// 修法是让印章与返回同一排（省一整行约 40px）。这条断言钉的是那个"同一排"：
+// 两者最近的公共祖先必须是那个 flex 行，不能是整块面板。
+test('出口与印章同一排，返回不再自己占一行', () => {
+  const tree = Select({ onPick: () => {}, onBack: () => {} });
+  const all: El[] = [];
+  walk(tree, all);
+  const has = (e: El, want: (k: El) => boolean) => {
+    const kids: El[] = [];
+    walk(e.props?.children, kids);
+    return kids.some(want);
+  };
+  const isSeal = (k: El) => k.type === Seal;
+  const isBack = (k: El) => k.type === Ghost && k.props?.label === '返回';
+  const both = (e: El) => has(e, isSeal) && has(e, isBack);
+  // height 最小的"同时含两者"节点 = 最近公共祖先（祖先包的子树一定比后代深）
+  const lca = all.filter(both).sort((a, b) => height(a) - height(b))[0];
+  expect(lca, '找不到同时装着印章与返回的元素——两者散开了？').toBeTruthy();
+  expect(lca.type, '印章与返回的公共祖先不是那个 flex 行，返回又自己占一行去了').toBe('div');
+  expect((lca.props?.style as React.CSSProperties)?.display, '那一行不是 flex').toBe('flex');
+});
+
+/** 子树高度：叶子算 1。用来在"同时含两者"的祖先里挑最浅的那一个（= 最近公共祖先） */
+function height(e: El): number {
+  const kids: El[] = [];
+  walk(e.props?.children, kids);
+  return 1 + Math.max(0, ...kids.map(height));
+}

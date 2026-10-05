@@ -5,9 +5,9 @@ import { DEFAULT_DIFFICULTY, DIFFICULTIES } from '../data/stages';
 import { traitOf } from '../data/traits';
 import { isMuted, setMuted, unlockAudio } from '../render/sfx';
 import { drawPortrait, onPartsLoaded, preloadParts } from '../render/renderer';
-import { goFullscreen } from './fullscreen';
+import { goFullscreen, isCoarsePointer } from './fullscreen';
 import { LEFT_OF_CLUSTER, skillSlotFor } from './TouchLayer';
-import { cn, SAFE, SERIF, T, VERTICAL } from './theme';
+import { cn, lsFix, SAFE, SERIF, T, VERTICAL } from './theme';
 import type { CharacterDef, Dir, Fighter, InputFrame } from '../engine/types';
 import { ARENA_MAX, ARENA_MIN } from '../engine/types';
 import type { Battle } from '../engine/battle';
@@ -34,11 +34,12 @@ function Seal({ label, onClick }: { label: string; onClick: () => void }) {
       onClick={onClick}
       style={{
         fontFamily: SERIF, fontSize: 'clamp(17px, min(4.6vh, 2.6vw), 34px)', letterSpacing: 3,
-        color: T.paper, background: T.zhusha, border: 'none',
+        color: T.paper, background: T.zhushaDeep, border: 'none',
         padding: 'clamp(11px, 2.1vh, 16px) clamp(20px, 3.6vw, 32px)',
-        // 印面内缩一圈边线：先留一圈朱砂余白，再压一道浅色细框。初版是贴边的 1px .34 细线，
-        // 截图里根本看不出来，整颗读成一个普通红方块——印章的样子全靠这道内框
-        boxShadow: 'inset 0 0 0 4px #C8443C, inset 0 0 0 5.5px rgba(237,227,210,.62)',
+        // 印面压深一档（3.80:1 → 4.67:1，见 theme.ts 的 zhushaDeep），印框仍是朱砂本色。
+        // 初版这里底色与内框同色，那 4px 其实一句谎都不说；现在它是真的一圈印框。
+        // 印面内缩一圈边线：先留一圈朱砂余白，再压一道浅色细框。
+        boxShadow: `inset 0 0 0 4px ${T.zhusha}, inset 0 0 0 5.5px rgba(237,227,210,.62)`,
         cursor: 'pointer', appearance: 'none', borderRadius: 0,
       }}
     >{label}</button>
@@ -59,7 +60,7 @@ function Ghost({ label, onClick, style, className }: {
         fontFamily: SERIF, fontSize: 'clamp(15px, min(3.9vh, 2.2vw), 29px)', letterSpacing: 3,
         color: T.faint, background: 'none', border: 'none',
         borderBottom: `1px solid ${T.hair}`, padding: '6px 4px 4px',
-        cursor: 'pointer', appearance: 'none', borderRadius: 0, ...style,
+        cursor: 'pointer', appearance: 'none', borderRadius: 0, ...lsFix(3), ...style,
       }}
     >{label}</button>
   );
@@ -133,10 +134,13 @@ function SourceLink() {
   );
 }
 
-export function Title({ onStart, onTraining, onHelp, record, diff = DEFAULT_DIFFICULTY, onDiff }: {
+export function Title({ onStart, onTraining, onHelp, record, hint, diff = DEFAULT_DIFFICULTY, onDiff }: {
   onStart: () => void; onTraining: () => void; onHelp: () => void;
   /** 闯关记录那一行；没有记录时传空串，这一行就不渲染 */
   record?: string;
+  /** 「下一步」那一行（修罗档另有收场）。与记录分两行：一行是账、一行是话，
+   * 挤成 26 字的一串时它读起来和上面的卖点行是同一类东西 */
+  hint?: string;
   /** 难度档。标准档的末关是 15%、六关连过 0.8%——那是给练熟了的人调的曲线，
    * 第一次上手的人会卡死在中段。街机厅有投币续关，手机上没有，就把这个选择交给玩家 */
   diff?: number; onDiff?: (i: number) => void;
@@ -165,7 +169,7 @@ export function Title({ onStart, onTraining, onHelp, record, diff = DEFAULT_DIFF
               授权，一旦被 await 打断到微任务之后，浏览器会直接拒绝 */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 'clamp(14px, 4vw, 28px)' }}>
             <Seal label="开始闯关" onClick={() => { unlockAudio(); goFullscreen(); onStart(); }} />
-            <Ghost label="训练场" onClick={() => { unlockAudio(); goFullscreen(); onTraining(); }} />
+            <Ghost label="陪练场" onClick={() => { unlockAudio(); goFullscreen(); onTraining(); }} />
             <Ghost label="操作说明" onClick={onHelp} />
           </div>
           <p style={{ margin: 0, fontSize: 'clamp(11px, min(2.1vh, 1.3vw), 18px)', letterSpacing: 2, color: T.dim }}>
@@ -183,8 +187,10 @@ export function Title({ onStart, onTraining, onHelp, record, diff = DEFAULT_DIFF
                 style={{
                   fontFamily: SERIF, fontSize: 'clamp(11px, min(2.1vh, 1.3vw), 18px)', letterSpacing: 2,
                   // 上下 3px 时整颗只有 48x24，是全站最小的触摸目标，而它是"开打之前要做的
-                  // 那个决定"。这一行左右都空着，加高不挤任何东西
-                  padding: '8px 10px', boxSizing: 'border-box',
+                  // 那个决定"。这一行左右都空着，加高不挤任何东西。
+                  // 8px 内边距实测仍只有 33px 高（低于本仓给静音键定的 40px 拇指下限），
+                  // 所以直接给 min-height，不靠伪元素外扩——伪元素量不到、也看不见
+                  padding: '8px 10px', minHeight: 40, boxSizing: 'border-box',
                   background: i === diff ? 'rgba(178,58,45,.18)' : 'transparent',
                   color: i === diff ? T.paper : T.faint,
                   border: `1px solid ${i === diff ? T.zhusha : T.hair}`,
@@ -202,6 +208,13 @@ export function Title({ onStart, onTraining, onHelp, record, diff = DEFAULT_DIFF
               margin: 0, fontFamily: SERIF, fontSize: 'clamp(11px, min(2.1vh, 1.3vw), 18px)',
               letterSpacing: 3, color: T.tenghuang,
             }}>{record}</p>
+          )}
+          {/* 「下一步」比记录暗一档：它是可选的邀请，不是要读的信息 */}
+          {hint && (
+            <p style={{
+              margin: 0, fontSize: 'clamp(10px, min(1.9vh, 1.2vw), 16px)',
+              letterSpacing: 2, color: T.faint,
+            }}>{hint}</p>
           )}
         </div>
       </div>
@@ -325,7 +338,9 @@ const helpPaneRef = (el: HTMLDivElement | null) => {
 
 export function Help({ onBack }: { onBack: () => void }) {
   const row = (a: string, b: string) => (
-    <div key={a} style={{ display: 'flex', gap: 10, fontSize: 'clamp(10px, min(1.9vh, 1.2vw), 15px)', lineHeight: 1.55 }}>
+    // 下限 10px → 11px：这一屏是全应用字最密的一页，也是十几个系统的唯一入口，
+    // 568x320 上取的就是这个下限。栏头同理从 9 抬到 10。
+    <div key={a} style={{ display: 'flex', gap: 10, fontSize: 'clamp(11px, min(1.9vh, 1.2vw), 15px)', lineHeight: 1.55 }}>
       {/* 7em = 防守栏里最长的那条标签。原来是 5.6em，那一行的说明会被顶得比同栏其余几行
           往右错开一截，读起来像排版没对齐。
           这里**刻意不把那条标签的字面量抄进注释**：guardCancelRoll 有一条断言正是
@@ -340,7 +355,7 @@ export function Help({ onBack }: { onBack: () => void }) {
   // 比两栏还难读。宁可少一栏，不要把字挤碎。
   const col = (title: string, rows: [string, string][]) => (
     <div key={title} style={{ display: 'grid', gap: 2, flex: '1 1 330px', minWidth: 0, alignContent: 'start' }}>
-      <div style={{ color: T.faint, letterSpacing: 3, fontSize: 'clamp(9px, min(1.6vh, 1vw), 13px)', marginBottom: 2 }}>{title}</div>
+      <div style={{ color: T.faint, letterSpacing: 3, fontSize: 'clamp(10px, min(1.6vh, 1vw), 13px)', marginBottom: 2 }}>{title}</div>
       {rows.map(([a, b]) => row(a, b))}
     </div>
   );
@@ -358,7 +373,7 @@ export function Help({ onBack }: { onBack: () => void }) {
         // height:100% 根本约束不住它（实测 568x320 下说明区自己算出 407px 高，比视口还高）
         alignSelf: 'stretch', justifySelf: 'stretch', height: '100%', maxHeight: '100%',
       }}>
-        <p style={{ margin: 0, fontFamily: SERIF, fontSize: 'clamp(15px, min(3vh, 2vw), 24px)', letterSpacing: 6 }}>操作</p>
+        <p style={{ margin: 0, fontFamily: SERIF, fontSize: 'clamp(15px, min(3vh, 2vw), 24px)', letterSpacing: 6, ...lsFix(6) }}>操作</p>
         <div ref={helpPaneRef} style={{
           display: 'flex', flexWrap: 'wrap', gap: 'clamp(10px, 3vw, 40px)',
           alignItems: 'flex-start', justifyContent: 'center',
@@ -379,49 +394,63 @@ export function Help({ onBack }: { onBack: () => void }) {
           // 收细并染成 hair 那档——它本来就是"细线、分隔栏"用的色，与其他分隔线同源。
           scrollbarWidth: 'thin', scrollbarColor: `${T.hair} transparent`,
         }}>
-          {/* 一律「先说手上怎么做，键盘补在末尾」。此前这三栏是混着写的：基本栏有四行直接
-              以 A D / S、W、J、L 开头，进攻/防守栏里受身、防御取消、投技解脱、爆气、吹飞
-              **只给了键盘字母**——而这是一个横屏手机游戏（桌面键盘按 spec 只是调试用的副产品）。
-              拿着手机的人读到「倒地瞬间新按 J 或 L」，屏幕上没有 J 也没有 L。
-              键位名也统一取界面自己的叫法（普攻键 / 技能键 / 大招键 / 防御键 / 吹飞键），
-              这套叫法在「技能」「大招」两行本来就在用，只是没铺开。 */}
+          {/* 一律「先说手上怎么做」，键盘字母不再逐行挂在末尾。
+              此前这三栏是混着写的：基本栏有四行直接以字母开头，进攻/防守栏里受身、
+              防御取消、投技解脱、爆气、吹飞只给了键盘字母，其余十几行又不带——
+              读起来像"有些系统键盘按不出来"。而这是一个横屏手机游戏
+              （桌面键盘按 spec 只是调试用的副产品），键盘表收成栏末一行，要查一眼看全。
+              键位名统一取界面自己的叫法（普攻键 / 技能键 / 大招键 / 防御键 / 吹飞键）。 */}
           {col('基本', [
-            ['移动 / 蹲', '摇杆左右 / 下　键盘 A D / S'],
-            ['跳', '摇杆上　轻点=小跳 按住=大跳　键盘 W'],
-            ['普攻', '普攻键　三段连击（第二段是下段扫堂）　键盘 J'],
+            ['移动 / 蹲', '摇杆左右 / 下'],
+            ['跳', '摇杆上　轻点=小跳 按住=大跳'],
+            ['普攻', '普攻键　三段连击（第二段是下段扫堂）'],
             // 一行说三件事（怎么出、去哪查、键盘是哪几个）在 667x375 下会顶到右边缘。
             // 拆成两行：先说怎么出，再说去哪查——后者是"需要时才找"的信息，不该和操作挤在一起。
-            ['技能', '技能键 + 摇杆：中立 / 推方向 / 推下　三记必杀　键盘 U I O'],
+            ['技能', '技能键 + 摇杆：中立 / 推方向 / 推下　三记必杀'],
             ['招式表', '选人页里每个人的四招都写着'],
-            ['大招', '大招键　气 50 奥义 / 100 超必杀　键盘 K'],
-            ['防御', '防御键　推下=蹲防　键盘 L'],
+            // 陪练场里那三处"和正式对局不一样"此前一个字都不说：气槽一放就回满、
+            // 读秒停在 60、双方血都打不掉。在这里练出来的手感需要知道它便宜在哪
+            ['陪练场', '标题页进　这里气常满、不读秒、双方的血打不掉'],
+            ['大招', '大招键　气 50 奥义 / 100 超必杀'],
+            ['防御', '防御键　推下=蹲防'],
             ['投技', '贴身按普攻键自动改投'],
           ])}
           {col('进攻', [
-            // 「先行入力」的入力是日文（输入）。这一屏只有它和「挑衅」不是简体中文写法
-            ['先行输入', '硬直里提前按也算数——出招键会记住 6 帧'],
-            ['连段取消', '普攻命中后再按一下普攻键，收招帧被下一段吃掉'],
-            ['必杀取消', '普攻命中后按技能／大招；挑空前取消最赚'],
-            ['大招取消', '必杀命中后按大招　n1→n2→必杀→大招 最赚'],
-            ['反击命中', '打在对手起手/判定帧里　伤害 ×1.2、硬直 +6'],
+            // 屏上的时间一律给秒，帧数留在括号里：手机玩家对"帧"没有直觉，而这一屏别处
+            // 已经用「5 秒」了——两种单位混在一页上，读的人不知道该拿哪个当准。
+            ['先行输入', '硬直里提前按也算数——出招键会记住 0.1 秒（6 帧）'],
+            ['连段取消', '普攻命中后再按一下普攻键，上一段的收势被下一段吃掉'],
+            ['必杀取消', '普攻命中后按技能／大招；把对手打起来之前取消最赚'],
+            // 引擎槽位名（n1/n2）不上屏：屏上叫「第一段/第二段」，这里也得叫那个
+            ['大招取消', '必杀命中后按大招　第一段→第二段→必杀→大招 最赚'],
+            ['反击命中', '打在对手正在出招的那一下里　伤害 ×1.2、硬直多 0.1 秒'],
             ['跑', '双击前进　可接跳/出招'],
             ['后跳', '双击后退　起跳无敌'],
-            ['吹飞攻击', '吹飞键　打飞到版边，必倒且不能受身　键盘 H 或 J+L'],
+            ['吹飞攻击', '吹飞键　打飞到版边，必倒且不能受身'],
             ['挑衅', '防御 + 上　削对手 10 气；只在对手倒地或离得远时出得来'],
           ])}
           {col('防守', [
             ['蹲防 / 站防', '站防挡不住下段，蹲防挡不住跳跃攻击'],
             ['紧急回避', '防御 + 左/右　穿过对手换边；中段无敌，收尾没有'],
-            ['受身', '倒地瞬间新按普攻键或防御键；大招/投技/吹飞打倒的不能受身'],
-            ['防御取消', '格挡中按普攻键（50 气）把对手顶开'],
-            // 这里的 · 是**专名内部的间隔号**（同招式名「风火轮·升龙」）：它是防御取消的一个
+            ['受身', '倒地瞬间立刻再按普攻键或防御键；大招/投技/吹飞打倒的不能受身'],
+            // 状态一律叫「防御」——玩家按的那颗键上写的就是「防御」，屏上不能同时有
+            // 「防御键」和「格挡中」两个名字指同一件事（「格挡」退回注释与测试名）
+            ['防御取消', '防御中按普攻键（50 气）把对手顶开'],
+            // 这里的 · 是**专名内部的间隔号**（同招式名「风火轮·拔地升龙」）：它是防御取消的一个
             // 变体，不是并列的两件事。/ 在这一栏只表示「或 / 又叫」（蹲防 / 站防、爆气 / MAX）
-            ['防御取消·回避', '格挡中新推方向（50 气）滚到对手背后；被逼到版边时用这个'],
-            ['投技解脱', '被投前的一瞬新按普攻键（按住不放无效）'],
+            ['防御取消·回避', '防御中新推方向（50 气）滚到对手背后；被逼到版边时用这个'],
+            ['投技解脱', '被投前的一瞬立刻再按普攻键（按住不放无效）'],
             // 蓄气那一半原来没写：按住不放是先攒气、够 50 才炸开，只说结果的话
             // 玩家不知道气不够时按着有没有用（对局里那条轮播提示反而说全了）
-            ['爆气 / MAX', '防御 + 大招按住蓄气　够 50 气炸开：顶开 + 无敌，5 秒伤害提升　键盘 L + K'],
+            ['爆气', '防御 + 大招按住蓄气　够 50 气炸开：顶开 + 无敌，5 秒伤害提升'],
           ])}
+          {/* 键盘收成这一行。helpAccuracy 的两条断言会扫这一段确认"每个能用的键都写过"，
+              改这一行等于改那两条断言的输入，别只删不加。
+              此前是 8 行各挂一个字母、其余十几行不带，读起来像"有些系统键盘按不出来"。 */}
+          <div style={{
+            flex: '1 1 100%', textAlign: 'center', marginTop: 2,
+            fontSize: 'clamp(11px, min(1.9vh, 1.2vw), 15px)', letterSpacing: 1, color: T.faint, ...lsFix(1),
+          }}>键盘（桌面）　移动 A D　跳 W　蹲 S　普攻 J　技能 U I O　大招 K　防御 L　吹飞 H（或 J + L）</div>
         </div>
         <Ghost label="返回" onClick={onBack} />
       </div>
@@ -436,15 +465,21 @@ export type DummyMode = 'idle' | 'stand' | 'crouch' | 'jumpin' | 'press' | 'figh
 
 export const DUMMY_MODES: { key: DummyMode; label: string; hint: string }[] = [
   { key: 'idle', label: '木桩', hint: '不动　练连段与取消路线' },
-  { key: 'stand', label: '站防', hint: '站着防　练下段（连击第二段是扫堂）' },
-  { key: 'crouch', label: '蹲防', hint: '蹲着防　练中段（跳起来打）' },
+  { key: 'stand', label: '站防', hint: '站着防　练下段（普攻第二段是扫堂）' },
+  // 「中段」在屏上只留一个意思（紧急回避的"无敌发生在动作中段"）。这一挡原来也叫它
+  // 练中段，而帮助页管跳起来那一下叫「跳跃攻击」（蹲防挡不住跳跃攻击）——
+  // 同一个词在一页里指高度、在另一页指时机，读的人只能猜
+  { key: 'crouch', label: '蹲防', hint: '蹲着防　练跳跃攻击（跳起来按普攻）' },
   // 对空是这套系统里最新、也最难自己摸出来的一环：AI 现在会读起跳、会站防、会用必杀迎击，
   // 玩家跳进去有 57% 被挡下。可反过来"别人跳我怎么办"却没地方练——
   // 木桩/站防/蹲防都不会跳，对打挡的 AI 跳得又太随机。
   { key: 'jumpin', label: '跳入', hint: '不停跳过来　练对空（下落段迎击最稳）' },
   // 防御取消、投技解脱、受身这三样此前只能在「对打」挡碰运气——那一挡的 AI
   // 会退会防会放招，一分钟压不上来几次。这一挡只干一件事：贴上来连续出招。
-  { key: 'press', label: '压制', hint: '贴身连打　练防御取消（格挡中按普攻/推方向）与投技解脱' },
+  // 说明里不写怎么按（那是帮助页的活），只点名这三样——名字与帮助页逐字一致。
+  // 原来那句 26 字，实测估宽 299px，而这一行真正的带宽不是整屏宽：
+  // 它挂在 LEFT_OF_CLUSTER 上，568 屏上只有 308px（判据见 trainingBarLayout）
+  { key: 'press', label: '压制', hint: '贴身连打　练防御取消、投技解脱、受身' },
   { key: 'fight', label: '对打', hint: '会还手　练反击命中与抓空挥' },
 ];
 
@@ -573,7 +608,7 @@ export function TrainingBar({ mode, onPick, foeId, onFoe, onExit }: {
 }) {
   const cur = DUMMY_MODES.find(m => m.key === mode)!;
   const chip = (on: boolean): React.CSSProperties => ({
-    font: 'inherit', fontSize: 12, letterSpacing: 1, padding: '3px 9px', cursor: 'pointer',
+    font: 'inherit', fontSize: 12, letterSpacing: 1, padding: '6px 9px', cursor: 'pointer',
     color: on ? T.paper : T.dim,
     background: on ? 'rgba(237,227,210,.14)' : 'rgba(7,13,24,.55)',
     border: `1px solid ${on ? T.dim : T.hair}`,
@@ -588,7 +623,9 @@ export function TrainingBar({ mode, onPick, foeId, onFoe, onExit }: {
       // 试过左上角，直接盖住角色名与血条（截图上一眼就看得见）。
       ...LEFT_OF_CLUSTER,
       top: 60, zIndex: 20,
-      display: 'grid', gap: 4, justifyItems: 'center', pointerEvents: 'auto',
+      // gap 4 → 6：热区靠 .sx-chip::before 上下各外扩 6px，行距 4 时相邻两行的热区会撞 8px。
+      // 6 是"热区刚好不互相侵入一半"的下限；再大这块就要往下盖住跳起的木桩了
+      display: 'grid', gap: 6, justifyItems: 'center', pointerEvents: 'auto',
     }}>
       <div style={{ display: 'flex', gap: 4 }}>
         {DUMMY_MODES.map(m => (
@@ -618,7 +655,9 @@ export function TrainingBar({ mode, onPick, foeId, onFoe, onExit }: {
           if (t.closest('button')) (e.currentTarget as HTMLDetailsElement).open = false;
         }}
       >
-        <summary style={{ ...chip(false), listStyle: 'none', display: 'inline-block', userSelect: 'none' }}>
+      {/* summary 也要挂 sx-chip：它此前只有 25px 高，是这一整块里最难按准的一颗，
+          而它偏偏是"换对手"这个动作的唯一入口（点开才看得见那十二颗） */}
+      <summary className="sx-chip" style={{ ...chip(false), listStyle: 'none', display: 'inline-block', userSelect: 'none' }}>
           换对手：{CHARACTERS.find(c => c.id === foeId)?.name ?? '—'}
         </summary>
         <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', justifyContent: 'center', paddingTop: 4 }}>
@@ -634,8 +673,8 @@ export function TrainingBar({ mode, onPick, foeId, onFoe, onExit }: {
           并排还顺带把它和挡位片隔开：紧挨着「木桩」的话，想换挡位却按出退出的代价太大。 */}
       <div style={{ display: 'flex', gap: 14, alignItems: 'baseline', justifyContent: 'center', flexWrap: 'wrap' }}>
         <span style={{ fontSize: 11, color: T.faint, letterSpacing: .5, whiteSpace: 'nowrap' }}>{cur.hint}</span>
-        <Ghost label="退出训练场" onClick={onExit} className="sx-chip"
-          style={{ fontFamily: 'inherit', fontSize: 11, letterSpacing: 1, padding: '2px 2px 1px' }} />
+        <Ghost label="退出陪练场" onClick={onExit} className="sx-chip"
+          style={{ fontFamily: 'inherit', fontSize: 11, letterSpacing: 1, padding: '7px 2px 6px' }} />
       </div>
     </div>
   );
@@ -718,7 +757,7 @@ export function Select({ onPick, onBack, training, cleared = [], pick = 0, onFoc
   return (
     <div style={{ ...S.full, placeItems: 'center' }}>
       <div style={{ display: 'grid', gap: 'clamp(8px, 2.2vh, 18px)', justifyItems: 'center' }}>
-        <p style={{ margin: 0, fontSize: 'clamp(12px, min(2.4vh, 1.5vw), 21px)', letterSpacing: 6, color: T.faint }}>
+        <p style={{ margin: 0, fontSize: 'clamp(12px, min(2.4vh, 1.5vw), 21px)', letterSpacing: 6, color: T.faint, ...lsFix(6) }}>
           {/* 陪练那版不写「进陪练场」：底下那颗印章就叫这个名字，标题再说一遍等于把
               按钮的话抢着说了——标题说这一屏是干什么的，按钮说按下去会发生什么。
               顺带解决一处压字：MenuBackdrop 那轮月亮画在固定逻辑坐标上，九个字的标题在
@@ -804,7 +843,10 @@ export function Select({ onPick, onBack, training, cleared = [], pick = 0, onFoc
           </div>
           {/* 详情：一次只读一个人的四条属性，读得动 */}
           <div style={{
-            display: 'grid', gap: 'clamp(6px, 1.6vh, 12px)', justifyItems: 'start',
+            // gap 下限 6 → 5：招式表补上 50 气那一档之后，「返回」又被顶出屏幕 2px
+            //（实测 bottom=322 / 视口 320，正是 batch1 刚修掉的那个 blocker 回来了）。
+            // 这一列一共六个间隙，收 1px 换回 6px 余量。**以后往这一列加行，先复量 568x320。**
+            display: 'grid', gap: 'clamp(5px, 1.6vh, 12px)', justifyItems: 'start',
             minWidth: 'clamp(120px, 22vw, 210px)',
           }}>
             <span style={{
@@ -823,6 +865,13 @@ export function Select({ onPick, onBack, training, cleared = [], pick = 0, onFoc
               // 代价只是上一行短一点。这一格是十二个人里最长的一句，别人更不会溢出。
               lineHeight: 1.5, maxWidth: '15em', textWrap: 'pretty',
             }}>{traitOf(cur)}</span>
+            {/* 六条柱子的口径说明。spread() 把最弱的一档定在 25%、最强 100%（故意的：
+                按最大值归一的话六条全挤在 86-100%，肉眼分不出谁快谁慢），但屏上从来没说
+                这是**相对**刻度——「上下段」只有 2 和 4 两种取值，画出来是 25% 与 100%，
+                读作"差四倍"，其实差两倍。矮屏放不下这一行，由 .sx-scope 按视口高开关。 */}
+            <span className="sx-scope" style={{
+              fontSize: 'clamp(10px, min(1.7vh, 1.05vw), 15px)', letterSpacing: 2, color: T.faint,
+            }}>相对全员</span>
             <span
               aria-label={`体力 ${cur.hp}，身法 ${cur.speed}，力道 ${power(cur)}，攻程 ${reach(cur)}，击退 ${push(cur)}，上下段 ${mixup(cur)}`}
               style={{ display: 'grid', gap: 4, width: '100%' }}
@@ -839,15 +888,20 @@ export function Select({ onPick, onBack, training, cleared = [], pick = 0, onFoc
                 十二个人 × 三记必杀全躺在数据里，选人页是唯一该说这件事的地方。
                 键位不在这里另写一份：直接问 skillSlotFor，那是触屏那边判槽位的同一个函数 */}
             <span
-              aria-label={`招式：${SKILL_ROWS.map(r => `${r.say} ${cur.moves[skillSlotFor(r.dir)].name}`).join('；')}；大招 ${cur.moves.sp100.name}`}
+              aria-label={`招式：${SKILL_ROWS.map(r => `${r.say} ${cur.moves[skillSlotFor(r.dir)].name}`).join('；')}；奥义 ${cur.moves.sp50.name}；超必杀 ${cur.moves.sp100.name}`}
               style={{
-                display: 'grid', gap: 3, width: '100%',
+                display: 'grid', gap: 2, width: '100%',
                 fontFamily: SERIF, fontSize: 'clamp(9px, min(1.6vh, 1.05vw), 15px)',
                 letterSpacing: 1, color: T.dim, lineHeight: 1.3,
               }}
             >
+              {/* 两档大招都列。此前只列超必杀，玩家进场才知道 50 气那档放的是什么；
+                  行名直接用键面上会出现的那两个词（气够时大招键就写着「奥义」「超必杀」），
+                  不再另立「大招」这第三个名字。**没有塞进 SKILL_ROWS**：那张表是
+                  方向→槽位的映射（skillSlotFor 只可能返回 s1/s2/s3），50 气不是方向决定的 */}
               {[...SKILL_ROWS.map(r => [r.key, cur.moves[skillSlotFor(r.dir)].name] as const),
-                ['大招', cur.moves.sp100.name.replace('超必杀·', '')] as const,
+                ['奥义', cur.moves.sp50.name.replace('奥义·', '')] as const,
+                ['超必杀', cur.moves.sp100.name.replace('超必杀·', '')] as const,
               ].map(([k, v]) => (
                 <span key={k} style={{ display: 'flex', gap: 8, justifyContent: 'space-between' }}>
                   <span style={{ opacity: 0.6, whiteSpace: 'nowrap' }}>{k}</span>
@@ -859,10 +913,18 @@ export function Select({ onPick, onBack, training, cleared = [], pick = 0, onFoc
                 每六次选人就有一次把人叫错。不去加一个性别字段来分「他/她」：那是为了
                 一颗按钮往角色数据里塞一个只有这里用得上的字段。
                 「出战」两个字既没有代词，又比「就是他」更直说按下去会发生什么。 */}
-            <Seal label={training ? '进陪练场' : '出战'} onClick={() => onPick(cur)} />
+            {/* 印章与「返回」并排同一行。此前「返回」是这一屏最后一行的独立元素，
+                而右列（名号 + 定位 + 特性 + 六条属性 + 四行招式 + 印章 + 返回）在 568x320
+                上量到 top=322 / 视口只有 320 高——**整颗出口在屏幕外**，而 html/body 是
+                overflow:hidden，滚不出来：小横屏上想退回标题页只能刷新。
+                并排省掉一整行（约 40px），刚好够；结算页的「下一关 + 回主页」本来就是同排，
+                两屏因此同一形制。属性与招式表一条都不砍——那六条是"卡面不说谎"逼出来的。 */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 'clamp(14px, 4vw, 28px)' }}>
+              <Seal label={training ? '进陪练场' : '出战'} onClick={() => onPick(cur)} />
+              <Ghost label="返回" onClick={onBack} />
+            </div>
           </div>
         </div>
-        <Ghost label="返回" onClick={onBack} />
       </div>
     </div>
   );
@@ -903,7 +965,7 @@ export function Result({ won, stage, last, total, stageName, bossName, nextStage
             外层再用同一个符号就读成了四段并列——实测这一行显示为
             「第一关 · 酆都·鬼门关 · 钟馗」，分不清哪个点是关名的一部分。
             改完之后 · 在这一屏只有一个意思：专名内部的间隔号。下一关那一行本来就是全角空格分组。 */}
-        <p style={{ margin: 0, fontSize: 'clamp(13px, min(2.6vh, 1.6vw), 22px)', letterSpacing: 3, color: T.paper }}>
+        <p style={{ margin: 0, fontSize: 'clamp(13px, min(2.6vh, 1.6vw), 22px)', letterSpacing: 3, color: T.paper, ...lsFix(3) }}>
           第{cn(stage)}关　{stageName}　{bossName}
         </p>
         {/* 对手的台词。四个对手打完只给一个「胜/败」的话，谁是谁完全没有分别；
@@ -911,7 +973,7 @@ export function Result({ won, stage, last, total, stageName, bossName, nextStage
         {quote && (
           <p style={{
             margin: 0, fontFamily: SERIF, fontSize: 'clamp(12px, min(2.2vh, 1.4vw), 19px)',
-            letterSpacing: 2, color: won ? T.dim : T.tenghuang, maxWidth: '22em', textAlign: 'center',
+            letterSpacing: 2, color: won ? T.dim : T.tenghuang, maxWidth: '22em', textAlign: 'center', ...lsFix(2),
           }}>「{quote}」</p>
         )}
         {/* 通关的收场白：四关打完只把标题换成「功德圆满」的话，四个角色的结局一模一样，
@@ -922,7 +984,7 @@ export function Result({ won, stage, last, total, stageName, bossName, nextStage
         {won && !last && nextBossName && (
           <p style={{
             margin: 0, fontSize: 'clamp(12px, min(2.2vh, 1.4vw), 19px)',
-            letterSpacing: 3, color: T.tenghuang,
+            letterSpacing: 3, color: T.tenghuang, ...lsFix(3),
           }}>下一关　{nextStageName}　{nextBossName}</p>
         )}
         {last && won && ending && (
@@ -931,7 +993,7 @@ export function Result({ won, stage, last, total, stageName, bossName, nextStage
             letterSpacing: 2, color: T.paper, maxWidth: '26em', textAlign: 'center', lineHeight: 1.9,
           }}>{ending}</p>
         )}
-        <p style={{ margin: 0, fontSize: 'clamp(11px, min(2vh, 1.3vw), 18px)', letterSpacing: 2, color: T.faint }}>
+        <p style={{ margin: 0, fontSize: 'clamp(11px, min(2vh, 1.3vw), 18px)', letterSpacing: 2, color: T.dim, ...lsFix(2) }}>
           共{cn(total - 1)}关 · {won ? `已过${cn(stage)}关` : `闯至第${cn(stage)}关`}
           {last && won && clearMs !== undefined && ` · 用时 ${fmtTime(clearMs)}`}
         </p>
@@ -950,9 +1012,12 @@ export function Result({ won, stage, last, total, stageName, bossName, nextStage
  * 一句给出理由的说明。 */
 export function RotateOverlay() {
   const [portrait, setPortrait] = useState(false);
+  /** 按过「仍要继续」而没能横过来。锁没解开的人正需要一句说得出口的话，
+   * 而不是继续听「转过来就自动继续」——那句对他是假的 */
+  const [stuck, setStuck] = useState(false);
   useEffect(() => {
     const mq = window.matchMedia('(orientation: portrait)');
-    const on = () => setPortrait(mq.matches);
+    const on = () => { setPortrait(mq.matches); setStuck(false); };
     on();
     mq.addEventListener('change', on);
     return () => mq.removeEventListener('change', on);
@@ -966,16 +1031,24 @@ export function RotateOverlay() {
         }} />
         <h2 style={{
           margin: 0, fontFamily: SERIF, fontWeight: 500,
-          fontSize: 'clamp(19px, 3.4vh, 26px)', letterSpacing: 6,
+          fontSize: 'clamp(19px, 3.4vh, 26px)', letterSpacing: 6, ...lsFix(6),
         }}>把手机横过来</h2>
-        <p style={{ margin: 0, fontSize: 13, letterSpacing: 2, color: T.faint, lineHeight: 1.7 }}>
-          横屏才放得下擂台与左右手的操作区。<br />转过来就自动继续。
+        <p style={{ margin: 0, fontSize: 13, letterSpacing: 2, color: T.faint, lineHeight: 1.7, ...lsFix(2) }}>
+          {stuck
+            ? <>这颗键没能把画面转过来。<br />{isCoarsePointer
+              ? '系统开了方向锁定：请在控制中心关掉它，再转一次手机。'
+              : '把窗口拉成横向（宽大于高）就能继续。'}</>
+            : <>横屏才放得下擂台与左右手的操作区。<br />转过来就自动继续。</>}
         </p>
         {/* 系统开了竖排方向锁的人，**物理转手机也转不过来**——这层遮罩盖住整屏（zIndex 99），
             连标题页那两颗按钮都点不到，而 goFullscreen 里的 orientation.lock 恰恰只挂在
             那两颗按钮上。结果是死锁：唯一能解锁横屏的入口，被"请你横屏"的提示自己挡住了。
-            所以这里必须自带一个出口——它同时也是那次 lock 需要的用户手势。 */}
-        <Seal label="仍要继续" onClick={() => { unlockAudio(); goFullscreen(); }} />
+            所以这里必须自带一个出口——它同时也是那次 lock 需要的用户手势。
+            按下去没锁成时（上面那段说明换成"这颗键没能把画面转过来"那一支）要说清楚为什么。 */}
+        <Seal label="仍要继续" onClick={() => {
+          unlockAudio();
+          void goFullscreen().then(ok => setStuck(!ok));
+        }} />
       </div>
     </div>
   );
