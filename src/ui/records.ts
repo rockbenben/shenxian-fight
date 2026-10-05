@@ -10,6 +10,7 @@
 
 /** 一个难度档下的战绩。三档各存一份——理由见 Record 的注释 */
 import { HARDEST_DIFF } from '../data/stages';
+import { cn } from '../data/cn';
 
 export interface Feat {
   /** 最远闯到第几关。0 = 还没赢过任何一关 */
@@ -78,11 +79,12 @@ export function summary(r: Record, lastStage: number, roster = 0, diff = r.diff,
   const cur = featOf(r, diff);
   if (cur.bestStage <= 0) return '';
   const done = cur.bestStage > lastStage;
-  // 关序号的中文数字。**别再写死长度**：这串曾经只有「一二三四」，
+  // 关序号的中文数字走 data/cn.ts 那一份表（这里原来另抄了一串
+  // '一二三四五六七八九十'，与 ui/theme.ts 那份是同一规则的副本）。
+  // 越界回落到阿拉伯数字而不是 undefined：这串曾经只有「一二三四」，
   // 阶梯从四关加到六关之后，打到第五关的人在标题页看到的是「最远 第undefined关」——
-  // 单元测试全绿，是打开浏览器看见的。取不到就退回阿拉伯数字，宁可朴素也不能出 undefined。
-  const CN = '一二三四五六七八九十';
-  const nth = CN[cur.bestStage - 1] ?? String(cur.bestStage);
+  // 单元测试全绿，是打开浏览器看见的。
+  const nth = cn(cur.bestStage - 1);
   const stagePart = done ? '已通关' : `最远 第${nth}关`;
   // 档名跟在最前面：三档各存一份，不说是哪一档的话，「已通关」又变回一句分不出轻重的话
   const parts = [diffName ? `${diffName}档 ${stagePart}` : stagePart];
@@ -95,11 +97,19 @@ export function summary(r: Record, lastStage: number, roster = 0, diff = r.diff,
     parts.push(left <= 0 ? `${roster} 人皆通` : `还差 ${left} 人`);
   }
   // 通了当前这一档、而它还不是最难那档时，才提一句修罗有专属收场。
-  // **只对已经通过关的人说**：没通过的人看到"更高难度另有奖励"只是又一条做不到的清单，
-  // 而通了的人正需要一个再来一趟的理由（真结局就是难度档要买的那份重玩理由，
-  // 见 CharacterDef.endingHard）。没通关时一个字都不提。
-  if (done && diff < HARDEST_DIFF) parts.push('修罗档另有收场');
+  // **这一句不在这一行里**：它不是"账"，是"下一步"。混在同一行就成了 26 字四段
+  // 同色同字号，而上一行卖点「六关连战 · 对手每趟不同 · 离线可玩」是同一个形制——
+  // 一行是广告、一行是账，读起来却像同一类信息。拆到 nextStep() 里单独一行。
   return parts.join(' · ');
+}
+
+/** 标题页第二行：已经通关的人才看得见的"下一步"。
+ * 判据与拆出来之前一致——**只对已经通过关的人说**：没通过的人看到"更高难度另有奖励"
+ * 只是又一条做不到的清单，而通了的人正需要一个再来一趟的理由
+ *（真结局就是难度档要买的那份重玩理由，见 CharacterDef.endingHard）。 */
+export function nextStep(r: Record, lastStage: number, diff = r.diff): string {
+  const cur = featOf(r, diff);
+  return cur.bestStage > lastStage && diff < HARDEST_DIFF ? '修罗档另有收场' : '';
 }
 
 const KEY = 'sx.record.v1';

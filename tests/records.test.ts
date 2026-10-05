@@ -5,7 +5,7 @@ import { find } from './helpers';
 import { CHARACTERS } from '../src/data/characters';
 import { Select } from '../src/ui/screens';
 import appSrc from '../src/App.tsx?raw';
-import { EMPTY, fmtTime, merge, summary, type Record, featOf, readRecord } from '../src/ui/records';
+import { EMPTY, fmtTime, merge, nextStep, summary, type Record, featOf, readRecord } from '../src/ui/records';
 import { STAGES } from '../src/data/stages';
 import { Title } from '../src/ui/screens';
 import { DIFFICULTIES, HARDEST_DIFF } from '../src/data/stages';
@@ -210,14 +210,20 @@ test('旧存档并进标准档，不丢也不误记', () => {
 test('通了低难度才提"修罗另有收场"，没通关时一个字都不提', () => {
   const cleared = (diff: number) => {
     const r = merge(EMPTY, LAST, true, 200_000, LAST, 'nezha', diff);   // 通关最后一关
-    return summary(r, LAST, 12, diff, DIFFICULTIES[diff].name);
+    return nextStep(r, LAST, diff);
   };
-  expect(cleared(0), '轻松档通关后没提修罗有专属收场').toContain('修罗档另有收场');
-  expect(cleared(1), '标准档通关后没提修罗有专属收场').toContain('修罗档另有收场');
+  expect(cleared(0), '轻松档通关后没提修罗有专属收场').toBe('修罗档另有收场');
+  expect(cleared(1), '标准档通关后没提修罗有专属收场').toBe('修罗档另有收场');
   // 修罗档自己通关了就不必再提——他已经看到了
-  expect(cleared(HARDEST_DIFF), '修罗档通关后还在提修罗').not.toContain('修罗档另有收场');
+  expect(cleared(HARDEST_DIFF), '修罗档通关后还在提修罗').toBe('');
 
   // 没通关的人不提：他看到的应该是"最远第几关"，不是又一条做不到的清单
   const half = merge(EMPTY, 2, true, 0, LAST, 'nezha', 0);   // 只赢到第三关
-  expect(summary(half, LAST, 12, 0, '轻松'), '还没通关就提了修罗').not.toContain('修罗档另有收场');
+  expect(nextStep(half, LAST, 0), '还没通关就提了修罗').toBe('');
+
+  // 拆行的前提：这句**不在账目那一行里**。它此前是 summary() 的第四段，
+  // 让标题页那一行变成 26 字四段同色同字号，和上一行卖点同一个形制
+  const done = merge(EMPTY, LAST, true, 200_000, LAST, 'nezha', 0);
+  expect(summary(done, LAST, 12, 0, DIFFICULTIES[0].name), '「下一步」还混在记录行里')
+    .not.toContain('修罗');
 });

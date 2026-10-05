@@ -10,6 +10,11 @@ export const T = {
   ground: '#0E141C',
   paper: INK.paper,
   zhusha: INK.cinnab,
+  /** 印泥压深的一档，只给印章的**底**用。
+   * 宣纸色的字压在 #C8443C 上是 3.80:1，17px 够不到 4.5——而这是四个屏的主操作。
+   * 压深到 #B23A2D 之后 4.67:1；印框那一圈仍然用朱砂本色的 INK.cinnab，
+   * 章还是那枚章，只是印泥厚了一点。画布里的印章与超必杀边框照旧用 zhusha，不受影响。 */
+  zhushaDeep: '#B23A2D',
   tenghuang: INK.gamboge,
   shiqing: INK.azurite,
   /** 同一个宣纸色相拉三档透明度，避免再引入灰阶。
@@ -19,6 +24,11 @@ export const T = {
   faint: 'rgba(237,227,210,.55)',  // 次级文字（13–15px）
   dim: 'rgba(237,227,210,.74)',    // 小字（10–13px）：更小所以要更亮
 };
+
+/** 居中 + 字距的中文排印：字距是加在每个字**后面**的，末字后面那道空让整串看着往左偏。
+ * 补一个等值的负右边距拉回光学居中。只给"居中的、带字距的"文本用——
+ * 左对齐的那些年号/属性标签不补（那里尾部空本来就在行尾，看不出问题）。 */
+export const lsFix = (ls: number): React.CSSProperties => ({ marginRight: -ls });
 
 /** 展示字：自带的思源宋子集，只用于名字与标题这类"排印"文本。
  * 交互文案保持 system-ui——正是这份克制让宋体读起来是郑重的，全站铺开反而失去分量。 */
@@ -39,10 +49,6 @@ export const SAFE: React.CSSProperties = {
   paddingLeft: 'env(safe-area-inset-left, 0px)',
 };
 
-/** 中文序数：关卡是"第二关"而不是"第 2 关"——阿拉伯数字在这套排印里是外来物。
- *
- * 表长到十。原来只到六、注释写着"关卡最多四关，多出两个是余量"——
- * 阶梯改成六关之后余量正好用光，再加一关就会静默回落成阿拉伯数字。
- * 同一个坑标题页已经踩过一次（关序号写死「一二三四」，第五关显示成 undefined）。 */
-export const CN_NUM = ['一', '二', '三', '四', '五', '六', '七', '八', '九', '十'];
-export const cn = (n: number) => CN_NUM[n] ?? String(n + 1);
+/** 中文序数。正本在 `data/cn.ts`（数据层那句「三记必杀」也要用它），
+ * 这里只是转发给界面层既有的 import 路径，别再抄第三份表。 */
+export { CN_NUM, cn } from '../data/cn';
