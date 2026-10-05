@@ -84,7 +84,7 @@ export const ERLANG: CharacterDef = {
     n3: mk('erlang_n3', 'n3', '三尖刀·重劈', 13, [6, 4, 14], 22, [8, 9], 0, 0, [28, 30, 95, 120], 'slam',
       [{ frame: 7, type: 'trail', color: AZURE, x: 60, y: 110 }, { frame: 9, type: 'burst', color: SILVER, x: 70, y: 60 }]),
     s1: {
-      ...mk('erlang_s1', 's1', '天眼光束', 16, [12, 6, 24], 20, [10, 0], 270, 0, [80, 70, 260, 40], 'cast',
+      ...mk('erlang_s1', 's1', '天眼横空·一条线', 16, [12, 6, 24], 20, [10, 0], 270, 0, [80, 70, 260, 40], 'cast',
       [{ frame: 5, type: 'glyph', color: VIOLET, x: 10, y: 130, size: 35 }, { frame: 12, type: 'beam', color: AZURE, x: 20, y: 130, size: 36 },
        { frame: 15, type: 'spark', color: SILVER, x: 300, y: 90 }]),
       projectile: {
@@ -95,10 +95,10 @@ export const ERLANG: CharacterDef = {
         kind: 'beam', color: '#5ab0ff',
       },
     },
-    s2: mk('erlang_s2', 's2', '哮天犬突袭', 15, [9, 6, 20], 18, [12, 0], 330, 0, [60, 40, 220, 60], 'cast',
+    s2: mk('erlang_s2', 's2', '哮天犬·咬住别动', 15, [9, 6, 20], 18, [12, 0], 330, 0, [60, 40, 220, 60], 'cast',
       [{ frame: 4, type: 'burst', color: SILVER, x: 30, y: 40 }, { frame: 8, type: 'trail', color: SILVER, x: 120, y: 45, size: 14 },
        { frame: 12, type: 'trail', color: SILVER, x: 220, y: 45, size: 12 }]),
-    s3: { ...mk('erlang_s3', 's3', '天罗地网', 18, [11, 8, 18], 26, [5, 13], 360, 0, [40, 20, 220, 160], 'cast',
+    s3: { ...mk('erlang_s3', 's3', '天罗地网·罩下来', 18, [11, 8, 18], 26, [5, 13], 360, 0, [40, 20, 220, 160], 'cast',
       [{ frame: 5, type: 'glyph', color: AZURE, x: 100, y: 100, size: 60 }, { frame: 11, type: 'ring', color: AZURE, x: 100, y: 100 },
        { frame: 15, type: 'ring', color: VIOLET, x: 150, y: 90 }]), weaponScale: 1.4 },
     // 奥义也是十秒级演出，但骨架与超必杀刻意不同：超必杀是「密集连打一路逼到版边」，
@@ -106,7 +106,7 @@ export const ERLANG: CharacterDef = {
     // 玩家一眼能分出放的是哪一档。九段：起势60 长蓄80 突进40 首击40 连击90 挑空50
     // 追击80 终结90 收势70。
     sp50: {
-      id: 'erlang_sp50', slot: 'sp50', name: '奥义·纵天斩', damage: 31,
+      id: 'erlang_sp50', slot: 'sp50', name: '奥义·刀劈桃山', damage: 31,
       weaponScale: 1.8,
       startup: ASSAULT_STARTUP, active: ASSAULT_ACTIVE, recovery: ASSAULT_RECOVERY, hitstun: 32,
       knockback: { x: 10, y: 8 }, cooldown: 0, meterCost: 50,

@@ -10,7 +10,7 @@ import { MOTIONS } from '../src/data/motions';
 test('招式名承诺变长的招，兵器倍率确实大于 1', () => {
   const wukong = CHARACTERS.find(c => c.id === 'wukong')!;
   // 如意棒：撑天与横扫千军都要伸长，且撑天最长
-  expect(wukong.moves.sp50.weaponScale, '奥义·如意棒撑天该最长').toBeGreaterThan(2);
+  expect(wukong.moves.sp50.weaponScale, '奥义·金箍撑天该最长').toBeGreaterThan(2);
   expect(wukong.moves.s1.weaponScale, '横扫千军该伸长').toBeGreaterThan(1.5);
   expect(wukong.moves.sp50.weaponScale!).toBeGreaterThan(wukong.moves.s1.weaponScale!);
   // 四个角色都至少有一招会变形，否则这套机制等于没接上

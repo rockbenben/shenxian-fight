@@ -88,29 +88,29 @@ export const HONGHAIER: CharacterDef = {
     n1: mk('honghaier_n1', 'n1', '火尖枪·刺', 7, [3, 3, 8], 14, [5, 0], 0, 0, [26, 62, 88, 30], 'thrust',
       [{ frame: 3, type: 'spark', color: FLAME, x: 84, y: 74 }]),
     // 下段扫堂 3 帧起手，全场最快的下段：骗招型的立身之本是「上下段猜不出来」
-    n2: { ...mk('honghaier_n2', 'n2', '燎地扫', 8, [3, 3, 9], 15, [6, 0], 0, 0, [22, 0, 96, 44], 'sweep',
+    n2: { ...mk('honghaier_n2', 'n2', '火尖枪·横扫', 8, [3, 3, 9], 15, [6, 0], 0, 0, [22, 0, 96, 44], 'sweep',
       [{ frame: 3, type: 'spark', color: RED, x: 88, y: 16 }]), guard: 'low' },
-    n3: mk('honghaier_n3', 'n3', '挑火', 13, [5, 4, 12], 22, [6, 11], 0, 0, [24, 38, 76, 104], 'upthrust',
+    n3: mk('honghaier_n3', 'n3', '火尖枪·上挑', 13, [5, 4, 12], 22, [6, 11], 0, 0, [24, 38, 76, 104], 'upthrust',
       [{ frame: 5, type: 'trail', color: FLAME, x: 54, y: 84 }, { frame: 7, type: 'burst', color: CORE, x: 60, y: 120 }]),
     // 三昧真火：一口喷出去的火。**寿命只有 22 帧**（二郎神的天眼光束是 60）——
     // 它不是隔屏对射的弹，是"中距离突然多出一段攻程"的骗招，喷完人还站在原地要收招
-    s1: mk('honghaier_s1', 's1', '三昧真火', 16, [9, 6, 16], 20, [9, 0], 240, 0, [40, 46, 170, 56], 'cast',
+    s1: mk('honghaier_s1', 's1', '三昧真火·一口来', 16, [9, 6, 16], 20, [9, 0], 240, 0, [40, 46, 170, 56], 'cast',
       [{ frame: 6, type: 'glyph', color: CORE, x: 20, y: 92, size: 30 },
        { frame: 10, type: 'burst', color: FLAME, x: 70, y: 78 },
        { frame: 13, type: 'trail', color: RED, x: 130, y: 74, size: 12 }]),
     // 火轮冲：突进最远、收招也最长的一招。撞进去之后是他唯一能强行贴脸的手段
-    s2: mk('honghaier_s2', 's2', '火轮冲', 15, [8, 6, 17], 18, [10, 0], 300, 0, [26, 30, 150, 76], 'rush',
+    s2: mk('honghaier_s2', 's2', '踏火轮·滚到人前', 15, [8, 6, 17], 18, [10, 0], 300, 0, [26, 30, 150, 76], 'rush',
       [{ frame: 2, type: 'trail', color: FLAME, x: -16, y: 50, size: 14 },
        { frame: 5, type: 'trail', color: RED, x: 44, y: 46, size: 12 },
        { frame: 9, type: 'shockwave', color: FLAME, x: 110, y: 0, size: 26 }], [{ frame: 2, vx: 17 }]),
     // 焚天升：他这一组里唯一打得倒人的必杀（同「倒不倒是招式属性」那条规矩）
     // weaponScale：焚天升是火顺着枪身窜上去，枪尖那一截火焰要真的伸出来（同如意棒撑天那套）
-    s3: { ...mk('honghaier_s3', 's3', '焚天升', 17, [7, 6, 18], 26, [4, 14], 360, 0, [12, 20, 84, 156], 'upthrust',
+    s3: { ...mk('honghaier_s3', 's3', '火起焚天·顺着枪', 17, [7, 6, 18], 26, [4, 14], 360, 0, [12, 20, 84, 156], 'upthrust',
       [{ frame: 5, type: 'bolt', color: CORE, x: 30, y: 60, size: 40, angle: 1.2 },
        { frame: 9, type: 'burst', color: FLAME, x: 40, y: 120 },
        { frame: 12, type: 'ring', color: RED, x: 34, y: 100, size: 34 }]), knockdown: true, weaponScale: 1.9 },
     sp50: {
-      id: 'honghaier_sp50', slot: 'sp50', name: '奥义·三昧真火', damage: 29,
+      id: 'honghaier_sp50', slot: 'sp50', name: '奥义·赤焰金莲', damage: 29,
       startup: ASSAULT_STARTUP, active: ASSAULT_ACTIVE, recovery: ASSAULT_RECOVERY, hitstun: 30,
       knockback: { x: 7, y: 15 }, cooldown: 0, meterCost: 50,
       multiHit: { hits: 11, interval: 31 },
@@ -167,7 +167,7 @@ export const HONGHAIER: CharacterDef = {
       },
     },
     sp100: {
-      id: 'honghaier_sp100', slot: 'sp100', name: '超必杀·圣婴烈焰', damage: 51,
+      id: 'honghaier_sp100', slot: 'sp100', name: '超必杀·圣婴大王', damage: 51,
       startup: SUPER_STARTUP, active: SUPER_ACTIVE, recovery: SUPER_RECOVERY, hitstun: 40,
       knockback: { x: 9, y: 18 }, cooldown: 0, meterCost: 100,
       // 段数全场最多（46 段）、每段最轻：他打的是"数量"，牛魔王打的是"分量"

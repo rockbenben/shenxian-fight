@@ -84,7 +84,7 @@ export const HOUYI: CharacterDef = {
   // 少瓣、极窄、尖锐：一圈立起来的箭
   superAura: { petals: 11, spread: 0.18, tipBlunt: 0, curl: 0 },
   moves: {
-    jA: { ...mk('houyi_jA', 'jA', '弓身砸', 10, [6, 14, 9], 22, [6, 0], 0, 0,
+    jA: { ...mk('houyi_jA', 'jA', '弓背·下砸', 10, [6, 14, 9], 22, [6, 0], 0, 0,
       [2, -30, 96, 86], 'airStrike',
       [{ frame: 6, type: 'spark', color: ARROW, x: 50, y: 16 }]), guard: 'overhead' },
     // 近身三招是"用弓身挡开"，收招仍是全场最长的一档——他被贴身就该难受。
@@ -95,18 +95,18 @@ export const HOUYI: CharacterDef = {
     // 它只会压上去（见 DEVELOPMENT.md「用手写机器人比"打法强弱"是不成立的」）。
     // 于是他的长处一分都兑现不了，短处却百分之百兑现。
     // 收招保留（那是他的定位），起手与伤害补回常规档：被贴身仍然吃亏，但不是站着挨打。
-    n1: mk('houyi_n1', 'n1', '弓身击', 9, [5, 3, 10], 14, [6, 0], 0, 0, [26, 58, 96, 34], 'thrust',
+    n1: mk('houyi_n1', 'n1', '弓背斩', 9, [5, 3, 10], 14, [6, 0], 0, 0, [26, 58, 96, 34], 'thrust',
       [{ frame: 5, type: 'spark', color: ARROW, x: 84, y: 72 }]),
-    n2: { ...mk('houyi_n2', 'n2', '扫弓', 10, [4, 3, 11], 15, [6, 0], 0, 0, [22, 0, 104, 44], 'sweep',
+    n2: { ...mk('houyi_n2', 'n2', '弓背·横扫', 10, [4, 3, 11], 15, [6, 0], 0, 0, [22, 0, 104, 44], 'sweep',
       [{ frame: 4, type: 'spark', color: BOW, x: 88, y: 16 }]), guard: 'low' },
-    n3: mk('houyi_n3', 'n3', '挑弓', 14, [6, 4, 14], 22, [7, 10], 0, 0, [24, 36, 90, 106], 'upthrust',
+    n3: mk('houyi_n3', 'n3', '弓背·上挑', 14, [6, 4, 14], 22, [7, 10], 0, 0, [24, 36, 90, 106], 'upthrust',
       [{ frame: 6, type: 'trail', color: SUN, x: 54, y: 84 }, { frame: 8, type: 'burst', color: ARROW, x: 58, y: 116 }]),
     // ── 三记必杀**全是箭** ──────────────────────────────────────────
     // 名册里此前没有人有超过一记投射物（二郎神的光束、哪吒的乾坤圈、铁扇的风刃各一）。
     // 他是唯一一个可以整局不进近身距离的人——三支箭分快/慢/高三档，
     // 逼对手在"绕过去""挡下来""跳过来"之间选，而每一种选择都要付不同的帧数。
     // 近身三招最差 + 身法倒数，就是这份自由的价钱。
-    s1: { ...mk('houyi_s1', 's1', '射日箭', 16, [8, 4, 15], 18, [7, 0], 210, 0, [34, 60, 100, 40], 'cast',
+    s1: { ...mk('houyi_s1', 's1', '射日一矢·先到', 16, [8, 4, 15], 18, [7, 0], 210, 0, [34, 60, 100, 40], 'cast',
       [{ frame: 5, type: 'glyph', color: SUN, x: 20, y: 96, size: 26 },
        { frame: 8, type: 'trail', color: ARROW, x: 70, y: 74, size: 10 }]),
       projectile: {
@@ -115,7 +115,7 @@ export const HOUYI: CharacterDef = {
         knockback: { x: 8, y: 0 }, w: 44, h: 16, y: 66, kind: 'arrow', color: SUN,
       } },
     // 落日矢：抛得高、飞得慢，落点在对手头顶——跳起来的人正好撞上去
-    s2: { ...mk('houyi_s2', 's2', '落日矢', 15, [10, 4, 17], 18, [6, 0], 300, 0, [34, 120, 90, 44], 'cast',
+    s2: { ...mk('houyi_s2', 's2', '挂天落日·照头来', 15, [10, 4, 17], 18, [6, 0], 300, 0, [34, 120, 90, 44], 'cast',
       [{ frame: 7, type: 'glyph', color: SUN, x: 20, y: 130, size: 30 },
        { frame: 11, type: 'trail', color: SUN, x: 70, y: 140, size: 12 }]),
       projectile: {
@@ -123,7 +123,7 @@ export const HOUYI: CharacterDef = {
         knockback: { x: 6, y: 6 }, w: 40, h: 40, y: 126, kind: 'arrow', color: SUN,
       } },
     // 贯石矢：慢、重、打得倒人。它是他唯一的"逼退键"——对手压上来时用它换空间
-    s3: { ...mk('houyi_s3', 's3', '贯石矢', 18, [12, 5, 19], 26, [12, 8], 360, 0, [34, 40, 100, 56], 'cast',
+    s3: { ...mk('houyi_s3', 's3', '贯石一矢·躺下吧', 18, [12, 5, 19], 26, [12, 8], 360, 0, [34, 40, 100, 56], 'cast',
       [{ frame: 8, type: 'glyph', color: ARROW, x: 20, y: 80, size: 34 },
        { frame: 13, type: 'burst', color: SUN, x: 76, y: 66 }]),
       knockdown: true, weaponScale: 1.5,
@@ -133,7 +133,7 @@ export const HOUYI: CharacterDef = {
         knockdown: true,
       } as never },
     sp50: {
-      id: 'houyi_sp50', slot: 'sp50', name: '奥义·射日', damage: 31,
+      id: 'houyi_sp50', slot: 'sp50', name: '奥义·引满天弧', damage: 31,
       weaponScale: 2.2,
       startup: ASSAULT_STARTUP, active: ASSAULT_ACTIVE, recovery: ASSAULT_RECOVERY, hitstun: 31,
       knockback: { x: 12, y: 13 }, cooldown: 0, meterCost: 50,

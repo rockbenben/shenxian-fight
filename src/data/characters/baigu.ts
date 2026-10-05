@@ -42,7 +42,7 @@ export const BAIGU: CharacterDef = {
   },
   ending: '白虎岭上再没有樵夫和老妇出现过。山道空了，走过的人只觉得风比别处冷些。',
   endingHard: '她照了照水面。第一次看见的不是三副皮囊，是一个人——水晃了晃，那个人还在。',
-  role: '虚实 · 上下',
+  role: '虚实 · 猜防',
   /**
    * **她刻意没有 aiBias**，而另外十一个人都有。
    *
@@ -78,9 +78,9 @@ export const BAIGU: CharacterDef = {
       [{ frame: 6, type: 'spark', color: BONE, x: 52, y: 16 }]), guard: 'overhead' },
     n1: mk('baigu_n1', 'n1', '骨爪·撩', 8, [4, 3, 9], 14, [5, 0], 0, 0, [26, 58, 96, 34], 'thrust',
       [{ frame: 4, type: 'spark', color: BONE, x: 86, y: 72 }]),
-    n2: { ...mk('baigu_n2', 'n2', '扫骨', 9, [4, 3, 9], 15, [6, 0], 0, 0, [22, 0, 106, 44], 'sweep',
+    n2: { ...mk('baigu_n2', 'n2', '骨爪·横扫', 9, [4, 3, 9], 15, [6, 0], 0, 0, [22, 0, 106, 44], 'sweep',
       [{ frame: 4, type: 'spark', color: CORPSE, x: 90, y: 16 }]), guard: 'low' },
-    n3: mk('baigu_n3', 'n3', '骨刺挑', 13, [5, 4, 13], 22, [6, 10], 0, 0, [24, 38, 84, 108], 'upthrust',
+    n3: mk('baigu_n3', 'n3', '骨刺·上挑', 13, [5, 4, 13], 22, [6, 10], 0, 0, [24, 38, 84, 108], 'upthrust',
       [{ frame: 6, type: 'trail', color: BONE, x: 54, y: 86 }, { frame: 8, type: 'burst', color: BLOOD, x: 58, y: 118 }]),
     // ── 她的立身之本：**必杀也分上下段** ──────────────────────────────
     // 全名册里 guard 只出现在两处：跳跃攻击（中段）与连击第二段（下段）。
@@ -88,22 +88,22 @@ export const BAIGU: CharacterDef = {
     // 她把这件事翻过来：贴地的白骨爪必须蹲防，从上砸下的骨刺升必须站防——
     // 两招起手同为 9 帧、判定框都从身前 30 开始，**看起来是一样的**。
     // 「你看见的从来不是我」这句台词，在机制上就是这一对。
-    s1: { ...mk('baigu_s1', 's1', '白骨爪', 15, [9, 5, 17], 20, [8, 0], 240, 0, [30, 0, 150, 52], 'rush',
+    s1: { ...mk('baigu_s1', 's1', '白骨爪·贴地来', 15, [9, 5, 17], 20, [8, 0], 240, 0, [30, 0, 150, 52], 'rush',
       [{ frame: 6, type: 'trail', color: CORPSE, x: 40, y: 14, size: 12 },
        { frame: 9, type: 'crescent', color: BONE, x: 110, y: 20, size: 40, angle: 0.15 },
        { frame: 12, type: 'spark', color: BLOOD, x: 160, y: 16 }], [{ frame: 3, vx: 9 }]), guard: 'low' },
-    s2: { ...mk('baigu_s2', 's2', '骨刺升', 15, [9, 5, 18], 20, [7, 0], 300, 0, [30, 86, 140, 92], 'cast',
+    s2: { ...mk('baigu_s2', 's2', '骨刺升·照头落', 15, [9, 5, 18], 20, [7, 0], 300, 0, [30, 86, 140, 92], 'cast',
       [{ frame: 6, type: 'trail', color: BONE, x: 40, y: 140, size: 12 },
        { frame: 9, type: 'crescent', color: CORPSE, x: 110, y: 130, size: 42, angle: -0.9 },
        { frame: 12, type: 'burst', color: BONE, x: 150, y: 120 }], [{ frame: 3, vx: 8 }]), guard: 'overhead' },
     // 尸骨阵：留在原地的一段骨墙。慢、伤害低，作用是逼对手换路线——
     // 与二郎神的光束（快而细）、铁扇的风刃（宽而推）都不是一回事
-    s3: { ...mk('baigu_s3', 's3', '尸骨阵', 16, [10, 6, 18], 24, [5, 12], 360, 0, [20, 10, 130, 130], 'cast',
+    s3: { ...mk('baigu_s3', 's3', '尸骨成阵·拦半路', 16, [10, 6, 18], 24, [5, 12], 360, 0, [20, 10, 130, 130], 'cast',
       [{ frame: 7, type: 'glyph', color: CORPSE, x: 30, y: 60, size: 38 },
        { frame: 11, type: 'burst', color: BONE, x: 70, y: 90 },
        { frame: 15, type: 'ring', color: BLOOD, x: 90, y: 70, size: 34 }]), knockdown: true, weaponScale: 1.8 },
     sp50: {
-      id: 'baigu_sp50', slot: 'sp50', name: '奥义·白骨爪', damage: 30,
+      id: 'baigu_sp50', slot: 'sp50', name: '奥义·遗尸脱壳', damage: 30,
       weaponScale: 2.4,
       startup: ASSAULT_STARTUP, active: ASSAULT_ACTIVE, recovery: ASSAULT_RECOVERY, hitstun: 31,
       knockback: { x: 8, y: 14 }, cooldown: 0, meterCost: 50,

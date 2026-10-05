@@ -80,7 +80,7 @@ export const MOTIONS: Record<string, Motion> = {
       { t: 40, pose: P({ crouch: 8, lean: 0.1, armF: [0.4, 0.45], armB: [-0.2, 0.35] }) },
     ],
   },
-  // 圣婴烈焰：先原地转一圈把火卷起来，再腾空压下去——比孙悟空那套更碎、更急
+  // 圣婴大王：先原地转一圈把火卷起来，再腾空压下去——比孙悟空那套更碎、更急
   honghaierSp100: { // startup16 active10[16,26) recovery→52
     loop: false, frames: 52,
     keys: [
@@ -117,7 +117,7 @@ export const MOTIONS: Record<string, Motion> = {
       { t: 40, pose: P({ crouch: 4, lean: 0.04, armF: [0.5, 0.6], armB: [-0.4, 0.5] }) },
     ],
   },
-  // 火焰山息：双臂大开，扇面立在身前，一记横扫把整片风推出去
+  // 一扇八荒：双臂大开，扇面立在身前，一记横扫把整片风推出去
   tieshanSp100: {
     loop: false, frames: 52,
     keys: [
@@ -290,7 +290,7 @@ export const MOTIONS: Record<string, Motion> = {
       { t: 100, pose: P({ crouch: 10, lean: 0.06, armF: [0.5, 0.36], armB: [-0.45, 0.32], legF: [0.16, -0.1] }) },
     ],
   },
-  // 干戚舞：盾一顶、斧一轮，整个人往前碾一步
+  // 干戚起舞：盾一顶、斧一轮，整个人往前碾一步
   xingtianSp50: {
     loop: false, frames: 40,
     keys: [
@@ -327,7 +327,7 @@ export const MOTIONS: Record<string, Motion> = {
       { t: 100, pose: P({ crouch: 12, lean: -0.1, headTilt: 0.1, armF: [1.1, 1.3], armB: [-0.45, 0.48], legF: [0.18, -0.12] }) },
     ],
   },
-  // 力劈华山：钉耙抡到头顶再整个人压下去
+  // 耙筑山门：钉耙抡到头顶再整个人压下去
   bajieSp50: {
     loop: false, frames: 40,
     keys: [

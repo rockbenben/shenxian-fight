@@ -87,15 +87,15 @@ export const WUKONG: CharacterDef = {
       [{ frame: 4, type: 'spark', color: GOLD, x: 100, y: 20 }]), weaponScale: 1.5, guard: 'low' },
     n3: mk('wukong_n3', 'n3', '如意棒·挑', 13, [5, 4, 13], 22, [7, 10], 0, 0, [25, 40, 85, 110], 'upthrust',
       [{ frame: 6, type: 'trail', color: GOLD, x: 60, y: 90 }, { frame: 8, type: 'burst', color: FIRE, x: 65, y: 130 }]),
-    s1: { ...mk('wukong_s1', 's1', '横扫千军', 17, [7, 5, 15], 20, [14, 0], 240, 0, [25, 50, 190, 60], 'rush',
+    s1: { ...mk('wukong_s1', 's1', '横扫千军·卷地来', 17, [7, 5, 15], 20, [14, 0], 240, 0, [25, 50, 190, 60], 'rush',
       [{ frame: 4, type: 'trail', color: GOLD, x: 60, y: 75, size: 12 }, { frame: 8, type: 'trail', color: GOLD, x: 140, y: 75, size: 12 },
        { frame: 11, type: 'spark', color: CLOUD, x: 180, y: 70 }], [{ frame: 3, vx: 10 }]), weaponScale: 2.4 },
     // 起手 6 帧配 160x70 的框，是全场唯一又快又宽的必杀（其他人 9/10/12 帧）。
     // 孙悟空实测总胜率 62-67%、打谁都赢，短板一处都没有——速度得付点代价，收到 9 帧。
-    s2: mk('wukong_s2', 's2', '筋斗云突袭', 15, [9, 6, 14], 18, [11, 0], 300, 0, [30, 50, 160, 70], 'rush',
+    s2: mk('wukong_s2', 's2', '筋斗云·十万八千', 15, [9, 6, 14], 18, [11, 0], 300, 0, [30, 50, 160, 70], 'rush',
       [{ frame: 2, type: 'trail', color: CLOUD, x: -20, y: 70, size: 16 }, { frame: 5, type: 'trail', color: CLOUD, x: 40, y: 70, size: 14 },
        { frame: 8, type: 'trail', color: CLOUD, x: 110, y: 70, size: 12 }], [{ frame: 2, vx: 16 }]),
-    s3: mk('wukong_s3', 's3', '分身幻击', 17, [10, 6, 18], 24, [6, 12], 360, 0, [60, 30, 180, 140], 'cast',
+    s3: mk('wukong_s3', 's3', '身外身·一齐动手', 17, [10, 6, 18], 24, [6, 12], 360, 0, [60, 30, 180, 140], 'cast',
       [{ frame: 4, type: 'glyph', color: GOLD, x: 40, y: 100, size: 45 }, { frame: 10, type: 'burst', color: GOLD, x: 100, y: 90 },
        { frame: 13, type: 'burst', color: CLOUD, x: 180, y: 90 }]),
     // 奥义也是十秒级演出，但骨架与超必杀刻意不同：超必杀是「密集连打一路逼到版边」，
@@ -103,7 +103,7 @@ export const WUKONG: CharacterDef = {
     // 玩家一眼能分出放的是哪一档。九段：起势60 长蓄80 突进40 首击40 连击90 挑空50
     // 追击80 终结90 收势70。
     sp50: {
-      id: 'wukong_sp50', slot: 'sp50', name: '奥义·如意棒撑天', damage: 32,
+      id: 'wukong_sp50', slot: 'sp50', name: '奥义·金箍撑天', damage: 32,
       weaponScale: 3.2,
       startup: ASSAULT_STARTUP, active: ASSAULT_ACTIVE, recovery: ASSAULT_RECOVERY, hitstun: 32,
       knockback: { x: 8, y: 16 }, cooldown: 0, meterCost: 50,

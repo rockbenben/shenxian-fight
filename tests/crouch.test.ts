@@ -17,7 +17,7 @@ test('按住蹲进入 crouch 状态，原地不动（同时按方向也不动）
 });
 
 test('下蹲能躲开高位判定框（站立命中/下蹲落空）', () => {
-  const highBox = { x: 20, y: 70, w: 60, h: 40 }; // 离地 70-110，仿二郎神天眼光束
+  const highBox = { x: 20, y: 70, w: 60, h: 40 }; // 离地 70-110，仿二郎神那记天眼横空
 
   const stand = new Battle(attackerWith(highBox), testChar(), 400, 500);
   stand.tick(press({ attack: true }), press());
@@ -32,7 +32,7 @@ test('下蹲能躲开高位判定框（站立命中/下蹲落空）', () => {
 });
 
 test('贴地判定框：下蹲照样命中', () => {
-  const lowBox = { x: 20, y: 0, w: 60, h: 60 }; // 离地 0-60，仿牛魔王裂地重击
+  const lowBox = { x: 20, y: 0, w: 60, h: 60 }; // 离地 0-60，仿牛魔王那记裂地一棍
   const b = new Battle(attackerWith(lowBox), testChar(), 400, 500);
   b.tick(press({ attack: true }), press({ crouch: true }));
   for (let i = 0; i < 2; i++) b.tick(press(), press({ crouch: true }));

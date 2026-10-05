@@ -18,9 +18,9 @@ const btn = (key: string, slot: MoveSlot | null, fallback = '—') =>
   ({ key, slot, fallback }) as Parameters<typeof buttonView>[0];
 
 test('技能键显示招式名而不是槽位序号，长名按间隔号与 4 字规则收短', () => {
-  expect(shortName('风火轮·升龙')).toBe('风火轮'); // 间隔号前那段
-  expect(shortName('筋斗云突袭')).toBe('筋斗云');   // 超过 4 字取前 3，仍是看得懂的东西
-  expect(shortName('烈焰突刺')).toBe('烈焰突刺');   // 正好 4 字不动
+  expect(shortName('风火轮·拔地升龙')).toBe('风火轮'); // 间隔号前那段
+  expect(shortName('筋斗云十万八千里')).toBe('筋斗云'); // 超过 4 字取前 3（现名册没有一个走到这里，它是给下一个角色留的护栏）
+  expect(shortName('烈焰突刺·细成线')).toBe('烈焰突刺'); // 正好 4 字的头不动
   expect(shortName('乾坤圈')).toBe('乾坤圈');
 
   // 全角色全技能位都不能再出现「技1/技2/技3」这类槽位名，且要压得进按钮（≤4 字）

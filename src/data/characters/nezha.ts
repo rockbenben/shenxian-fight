@@ -107,7 +107,7 @@ export const NEZHA: CharacterDef = {
     s1: {
       // s1 的判定框 170x50 是全场最小的必杀框，而哪吒的招整体又窄又竖（s3 是 90x170 的对空）。
       // 在 50% 近身 / 47% 中距的对局里横向够不着，速度快也换不来命中。放宽到 186x58。
-      id: 'nezha_s1', slot: 's1', name: '烈焰突刺', damage: 16,
+      id: 'nezha_s1', slot: 's1', name: '烈焰突刺·细成线', damage: 16,
       weaponScale: 1.5,
       startup: 8, active: 5, recovery: 14, hitstun: 20,
       knockback: { x: 13, y: 0 }, cooldown: 240, meterCost: 0,
@@ -120,7 +120,7 @@ export const NEZHA: CharacterDef = {
       ],
     },
     s2: {
-      id: 'nezha_s2', slot: 's2', name: '乾坤圈', damage: 14,
+      id: 'nezha_s2', slot: 's2', name: '乾坤圈·去一回', damage: 14,
       // 乾坤圈是件回旋兵器——招式名承诺了实物，就得真的飞出去再飞回来。
       // 判定交给投射物自己（下面 damage 归零那部分由 projectile 承担），近身的框仍留着
       // 兜住"贴脸放"的情形
@@ -145,7 +145,7 @@ export const NEZHA: CharacterDef = {
       // 18→17：名册长到十人之后他的总胜率压在 65% 的上限线上（断言是严格小于）。
       // 他一项都不领先、却哪一项都不垫底——全能型的顶点本来就最容易滑出上界，
       // 削的是伤害而不是速度：速度是他的定位，伤害本来就不是
-      id: 'nezha_s3', slot: 's3', name: '风火轮·升龙', damage: 17,
+      id: 'nezha_s3', slot: 's3', name: '风火轮·拔地升龙', damage: 17,
       startup: 6, active: 6, recovery: 18, hitstun: 26,
       knockback: { x: 4, y: 15 }, cooldown: 360, meterCost: 0,
       hitbox: { x: 15, y: 20, w: 90, h: 170 }, motionId: 'upthrust',
@@ -160,7 +160,7 @@ export const NEZHA: CharacterDef = {
     // 玩家一眼能分出放的是哪一档。九段：起势60 长蓄80 突进40 首击40 连击90 挑空50
     // 追击80 终结90 收势70。
     sp50: {
-      id: 'nezha_sp50', slot: 'sp50', name: '奥义·混天绫', damage: 30,
+      id: 'nezha_sp50', slot: 'sp50', name: '奥义·混天缚地', damage: 30,
       startup: ASSAULT_STARTUP, active: ASSAULT_ACTIVE, recovery: ASSAULT_RECOVERY, hitstun: 30,
       knockback: { x: 9, y: 7 }, cooldown: 0, meterCost: 50,
       // 段数比超必杀少一半、每下更重，结构上守住两档的区别

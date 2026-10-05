@@ -79,10 +79,29 @@ test('vsIntro 的键全是真角色 id，且不跟通用那句撞', () => {
 test('取法走 introQuote：写过的用专属，没写过的回落通用', () => {
   const niumo = CHARACTERS.find(c => c.id === 'niumo')!;
   expect(introQuote(niumo, 'honghaier'), '写过的组合没取到专属开场白').toBe(niumo.vsIntro!.honghaier);
-  expect(introQuote(niumo, 'baigu'), '没写过的组合没回落到通用开场白').toBe(niumo.quotes.intro);
+  // 回落那一条**不拿现成的数据缺口当证人**：最后一关固定是牛魔王，他的表本来就该填满
+  // （填满之后"随便挑一对都没写过"就不成立了，硬挑一个会把机制钉成内容清单）。
+  // 要验的是机制，就自己造一个缺口。
+  const gap = structuredClone(niumo);
+  delete gap.vsIntro!.baigu;
+  expect(introQuote(gap, 'baigu'), '删掉那一格之后没回落到通用开场白').toBe(niumo.quotes.intro);
   // 任取一对都不该产出空——回落必须永远兜得住
   for (const a of CHARACTERS) for (const b of CHARACTERS) {
     expect(introQuote(a, b.id), `${a.name} 对 ${b.name} 的开场白是空的`).toBeTruthy();
+  }
+});
+
+// 最后一关固定是牛魔王，所以**每一个玩家必然听他说过一句开场白**——这张表少一个键，
+// 那个人整趟阶梯最隆重的一次开口就是通用词。别人的关系表少写是少一句彩蛋，这里少写
+// 是每次都缺。（vs / vsLose 那两张表反过来：写一半才是缺陷，判据在 vsQuotes.test.ts。）
+test('牛魔王对名册里每一个人都有一句专属开场白——最后一关谁都躲不过他', () => {
+  const boss = CHARACTERS.find(c => c.id === 'niumo')!;
+  for (const c of CHARACTERS) {
+    const line = boss.vsIntro?.[c.id];
+    expect(line, `${c.name} 打到积雷山，牛魔王对他说的还是通用那句`).toBeTruthy();
+    expect(line, `牛魔王对 ${c.name} 说的就是通用那句`).not.toBe(boss.quotes.intro);
+    expect([...line!].length, `牛魔王对 ${c.name} 那句太长，横幅第四行放不下：「${line}」`)
+      .toBeLessThanOrEqual(14);
   }
 });
 

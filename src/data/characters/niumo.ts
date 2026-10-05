@@ -29,6 +29,16 @@ export const NIUMO: CharacterDef = {
     honghaier: '你娘让你回去。',
     tieshan: '扇子放下，回家。',
     wukong: '这一次没人劝架。',
+    // 最后一关固定是他，所以这张表跟别人的不一样：**别人少写一个键只是少一句彩蛋，
+    // 他少写一个键，那个人整趟阶梯最隆重的一次开口就是通用词。**十二个人都得有。
+    baigu: '皮相在这山上没用。',
+    bajie: '天蓬也下界来抢东西了。',
+    erlang: '灌江口那位，也肯下山。',
+    houyi: '射日的也来管我的山。',
+    nezha: '三头六臂，今天使得出么。',
+    leizhen: '落地再说话。',
+    xingtian: '没有头的，也来搬我的山？',
+    zhongkui: '这里没有鬼。',
     // 镜像战：选牛魔王的人，末关打的就是他自己（FINAL_BOSS 固定是他）。
     // 这不是边角情形，是**每个选他的玩家必然撞上的一场**——不该还说那句通用的。
     niumo: '哪个是真的，打完知道。',
@@ -39,7 +49,7 @@ export const NIUMO: CharacterDef = {
     niumo: '看镜子呢。',
   },
   crown: { kind: 'horns', color: '#d8a05c' },
-  quotes: { win: '小辈，山可移，我不动。', lose: '这一拳……有点意思。',
+  quotes: { win: '小辈，山可移，我不动。', lose: '这一下……有点意思。',
     taunt: '再来，我站着不动。' , intro: '站稳了，别一下就飞出去。'},
   vs: {
     wukong: '结拜时你叫大哥，翻脸也没改口。',
@@ -82,21 +92,21 @@ export const NIUMO: CharacterDef = {
     jA: { ...mk('niumo_jA', 'jA', '坠身肘击', 12, [6, 14, 9], 24, [6, 0], 0, 0,
       [4, -36, 96, 96], 'airStrike',
       [{ frame: 7, type: 'spark', color: EMBER, x: 56, y: 16 }]), guard: 'overhead' },
-    n1: mk('niumo_n1', 'n1', '重拳', 10, [6, 3, 11], 16, [6, 0], 0, 0, [28, 65, 95, 45], 'thrust',
+    n1: mk('niumo_n1', 'n1', '混铁棍·戳', 10, [6, 3, 11], 16, [6, 0], 0, 0, [28, 65, 95, 45], 'thrust',
       [{ frame: 6, type: 'spark', color: BRONZE, x: 90, y: 82 }]),
     // 下段：判定框贴地，站防挡不住
-    n2: { ...mk('niumo_n2', 'n2', '扫堂腿', 11, [5, 3, 12], 16, [7, 0], 0, 0, [22, 0, 108, 50], 'sweep',
+    n2: { ...mk('niumo_n2', 'n2', '混铁棍·横扫', 11, [5, 3, 12], 16, [7, 0], 0, 0, [22, 0, 108, 50], 'sweep',
       [{ frame: 5, type: 'spark', color: BRONZE, x: 90, y: 22 }]), guard: 'low' },
-    n3: mk('niumo_n3', 'n3', '双锤砸', 15, [7, 4, 15], 24, [9, 8], 0, 0, [25, 25, 100, 120], 'slam',
+    n3: mk('niumo_n3', 'n3', '混铁棍·下砸', 15, [7, 4, 15], 24, [9, 8], 0, 0, [25, 25, 100, 120], 'slam',
       [{ frame: 8, type: 'burst', color: EMBER, x: 70, y: 40 }, { frame: 10, type: 'shockwave', color: BRONZE, x: 70, y: 10 }]),
-    s1: mk('niumo_s1', 's1', '蛮牛冲撞', 18, [10, 8, 18], 24, [16, 0], 300, 0, [25, 40, 200, 90], 'rush',
+    s1: mk('niumo_s1', 's1', '蛮牛一头·由他撞', 18, [10, 8, 18], 24, [16, 0], 300, 0, [25, 40, 200, 90], 'rush',
       [{ frame: 5, type: 'shockwave', color: BRONZE, x: 20, y: 20 }, { frame: 10, type: 'spark', color: EMBER, x: 120, y: 60 },
        { frame: 14, type: 'burst', color: BRONZE, x: 190, y: 70 }], [{ frame: 4, vx: 15 }]),
-    s2: { ...mk('niumo_s2', 's2', '裂地重击', 17, [12, 5, 20], 24, [8, 10], 330, 0, [30, 0, 180, 60], 'slam',
+    s2: { ...mk('niumo_s2', 's2', '裂地一棍·翻三尺', 17, [12, 5, 20], 24, [8, 10], 330, 0, [30, 0, 180, 60], 'slam',
       [{ frame: 10, type: 'shockwave', color: EMBER, x: 90, y: 5 }, { frame: 13, type: 'burst', color: BRONZE, x: 140, y: 20 },
        { frame: 15, type: 'spark', color: EMBER, x: 60, y: 10 }]), weaponScale: 1.45 },
     s3: {
-      ...mk('niumo_s3', 's3', '怒吼震慑', 16, [9, 8, 16], 22, [12, 0], 360, 0, [0, 20, 240, 160], 'cast',
+      ...mk('niumo_s3', 's3', '震天一吼·退半屏', 16, [9, 8, 16], 22, [12, 0], 360, 0, [0, 20, 240, 160], 'cast',
       [{ frame: 5, type: 'ring', color: EMBER, x: 30, y: 100 }, { frame: 9, type: 'ring', color: BRONZE, x: 80, y: 100 },
        { frame: 13, type: 'ring', color: EMBER, x: 140, y: 100 }]),
       projectile: {

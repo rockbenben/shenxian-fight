@@ -63,7 +63,7 @@ test('倍率只给普通技，且不会把兵器拉成面条', () => {
 
 test('手写的倍率优先——自动值不许覆盖数据里明写的', () => {
   const wukong = CHARACTERS.find(c => c.id === 'wukong')!;
-  expect(wukong.moves.sp50.weaponScale, '如意棒撑天本来就手写了倍率').toBeGreaterThan(2);
+  expect(wukong.moves.sp50.weaponScale, '金箍撑天本来就手写了倍率').toBeGreaterThan(2);
   expect(autoWeaponScale(wukong, wukong.moves.sp50)).toBe(wukong.moves.sp50.weaponScale);
 });
 

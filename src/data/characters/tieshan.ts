@@ -72,22 +72,22 @@ export const TIESHAN: CharacterDef = {
   // 花瓣少而极宽、尖端钝：风是「面」不是「刺」，与红孩儿那朵二十瓣的卷焰正好相反
   superAura: { petals: 9, spread: 0.5, tipBlunt: 0.55, curl: 0.1 },
   moves: {
-    jA: { ...mk('tieshan_jA', 'jA', '扇底风', 10, [5, 14, 8], 22, [7, 0], 0, 0,
+    jA: { ...mk('tieshan_jA', 'jA', '扇面坠', 10, [5, 14, 8], 22, [7, 0], 0, 0,
       [2, -30, 100, 88], 'airStrike',
       [{ frame: 6, type: 'crescent', color: WIND, x: 52, y: 18, size: 30 }]), guard: 'overhead' },
-    n1: mk('tieshan_n1', 'n1', '扇面拍', 9, [5, 3, 9], 14, [6, 0], 0, 0, [26, 60, 100, 34], 'thrust',
+    n1: mk('tieshan_n1', 'n1', '扇底风', 9, [5, 3, 9], 14, [6, 0], 0, 0, [26, 60, 100, 34], 'thrust',
       [{ frame: 5, type: 'spark', color: MOON, x: 88, y: 74 }]),
     // 下段：扇子贴地一扫，风把人往后推。击退 10 是全场普攻里最高的
     // 击退只有 6：**推开是必杀的事，不是普攻的事**。第一版给普攻 9/10/11 的高击退，
     // 结果三段连打第二段就把人推出了第三段的射程——她的招牌把她自己的连段拆了
     // （chainAndTrade 那条当场报「只有 2 段」）。s1 的 20 仍是全场最高，招牌留在那里
-    n2: { ...mk('tieshan_n2', 'n2', '扫叶', 10, [4, 3, 10], 15, [6, 0], 0, 0, [22, 0, 108, 46], 'sweep',
+    n2: { ...mk('tieshan_n2', 'n2', '扇风·横扫', 10, [4, 3, 10], 15, [6, 0], 0, 0, [22, 0, 108, 46], 'sweep',
       [{ frame: 4, type: 'crescent', color: JADE, x: 90, y: 14, size: 26 }]), guard: 'low' },
-    n3: mk('tieshan_n3', 'n3', '卷风起', 14, [6, 4, 13], 22, [8, 9], 0, 0, [24, 36, 92, 108], 'upthrust',
+    n3: mk('tieshan_n3', 'n3', '卷风·上挑', 14, [6, 4, 13], 22, [8, 9], 0, 0, [24, 36, 92, 108], 'upthrust',
       [{ frame: 6, type: 'trail', color: WIND, x: 56, y: 86 }, { frame: 8, type: 'ring', color: JADE, x: 60, y: 112, size: 30 }]),
     // 一扇之风：**全场击退最高**（20）、伤害却最低。它买的不是血，是**距离**——
     // 把人推回她要的那个位置，正是这个角色赢的方式。判定框又宽又矮，贴地推过去
-    s1: { ...mk('tieshan_s1', 's1', '一扇之风', 13, [10, 7, 18], 18, [20, 0], 240, 0, [30, 20, 200, 70], 'cast',
+    s1: { ...mk('tieshan_s1', 's1', '一扇之风·退三舍', 13, [10, 7, 18], 18, [20, 0], 240, 0, [30, 20, 200, 70], 'cast',
       [{ frame: 7, type: 'crescent', color: WIND, x: 60, y: 60, size: 46, angle: 0.1 },
        { frame: 11, type: 'crescent', color: JADE, x: 130, y: 56, size: 52, angle: -0.1 },
        { frame: 15, type: 'trail', color: MOON, x: 190, y: 52, size: 14 }]),
@@ -98,17 +98,17 @@ export const TIESHAN: CharacterDef = {
         knockback: { x: 18, y: 0 }, w: 62, h: 76, y: 24, kind: 'fan', color: WIND,
       } },
     // 退风步：唯一一记**向后**的必杀。被贴身时用它拉开，是她的脱身键
-    s2: mk('tieshan_s2', 's2', '退风步', 14, [7, 5, 16], 18, [14, 0], 300, 0, [10, 30, 120, 90], 'rush',
+    s2: mk('tieshan_s2', 's2', '退风一步·让开位', 14, [7, 5, 16], 18, [14, 0], 300, 0, [10, 30, 120, 90], 'rush',
       [{ frame: 2, type: 'ring', color: JADE, x: 20, y: 60, size: 34 },
        { frame: 6, type: 'crescent', color: WIND, x: 70, y: 58, size: 40, angle: 0.2 }], [{ frame: 2, vx: -13 }]),
     // 罗刹旋：她这一组里唯一打得倒人的必杀，也是唯一一记贴身用的招
-    s3: { ...mk('tieshan_s3', 's3', '罗刹旋', 17, [9, 8, 17], 26, [16, 10], 360, 0, [16, 16, 150, 140], 'cast',
+    s3: { ...mk('tieshan_s3', 's3', '罗刹回身·旋翻你', 17, [9, 8, 17], 26, [16, 10], 360, 0, [16, 16, 150, 140], 'cast',
       [{ frame: 6, type: 'ring', color: WIND, x: 40, y: 70, size: 44 },
        { frame: 10, type: 'crescent', color: JADE, x: 70, y: 80, size: 54, angle: -0.5 },
        { frame: 14, type: 'crescent', color: MOON, x: 80, y: 60, size: 50, angle: 0.6 }]),
       knockdown: true, weaponScale: 1.7 },
     sp50: {
-      id: 'tieshan_sp50', slot: 'sp50', name: '奥义·一扇之威', damage: 30,
+      id: 'tieshan_sp50', slot: 'sp50', name: '奥义·熄火生风', damage: 30,
       weaponScale: 2.6,
       startup: ASSAULT_STARTUP, active: ASSAULT_ACTIVE, recovery: ASSAULT_RECOVERY, hitstun: 31,
       knockback: { x: 18, y: 12 }, cooldown: 0, meterCost: 50,
@@ -165,7 +165,7 @@ export const TIESHAN: CharacterDef = {
       },
     },
     sp100: {
-      id: 'tieshan_sp100', slot: 'sp100', name: '超必杀·火焰山息', damage: 53,
+      id: 'tieshan_sp100', slot: 'sp100', name: '超必杀·一扇八荒', damage: 53,
       weaponScale: 3.0,
       startup: SUPER_STARTUP, active: SUPER_ACTIVE, recovery: SUPER_RECOVERY, hitstun: 41,
       knockback: { x: 22, y: 16 }, cooldown: 0, meterCost: 100,

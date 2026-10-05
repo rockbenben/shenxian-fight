@@ -83,29 +83,29 @@ export const BAJIE: CharacterDef = {
     jA: { ...mk('bajie_jA', 'jA', '钉耙坠', 11, [6, 14, 10], 23, [7, 0], 0, 0,
       [2, -32, 104, 92], 'airStrike',
       [{ frame: 6, type: 'spark', color: IRON, x: 54, y: 16 }]), guard: 'overhead' },
-    n1: mk('bajie_n1', 'n1', '钉耙击', 10, [5, 3, 10], 15, [6, 0], 0, 0, [26, 60, 100, 36], 'thrust',
+    n1: mk('bajie_n1', 'n1', '一耙筑', 10, [5, 3, 10], 15, [6, 0], 0, 0, [26, 60, 100, 36], 'thrust',
       [{ frame: 5, type: 'spark', color: IRON, x: 90, y: 76 }]),
     // 击退 6 而不是 7：7 时第二段把人推出了第三段的射程，三段连打断在中间
-    n2: { ...mk('bajie_n2', 'n2', '扫耙', 10, [5, 3, 11], 16, [6, 0], 0, 0, [22, 0, 108, 46], 'sweep',
+    n2: { ...mk('bajie_n2', 'n2', '钉耙·横扫', 10, [5, 3, 11], 16, [6, 0], 0, 0, [22, 0, 108, 46], 'sweep',
       [{ frame: 5, type: 'spark', color: ROBE, x: 90, y: 16 }]), guard: 'low' },
     // n3 是投技伤害的底数（投 = n3 × 1.35），所以他的重击必须够重
-    n3: mk('bajie_n3', 'n3', '举耙砸', 15, [7, 4, 15], 24, [7, 9], 0, 0, [26, 32, 104, 114], 'upthrust',
+    n3: mk('bajie_n3', 'n3', '钉耙·下砸', 15, [7, 4, 15], 24, [7, 9], 0, 0, [26, 32, 104, 114], 'upthrust',
       [{ frame: 7, type: 'trail', color: IRON, x: 58, y: 86 }, { frame: 9, type: 'burst', color: WARM, x: 62, y: 118 }]),
     // 一步扑：贴上去的手段。他的三记必杀里两记都是"缩短距离"，因为他只要贴上就赢
-    s1: mk('bajie_s1', 's1', '一步扑', 15, [9, 6, 17], 20, [9, 0], 260, 0, [24, 26, 150, 110], 'rush',
+    s1: mk('bajie_s1', 's1', '一步扑·撞进怀', 15, [9, 6, 17], 20, [9, 0], 260, 0, [24, 26, 150, 110], 'rush',
       [{ frame: 3, type: 'trail', color: ROBE, x: 16, y: 60, size: 14 },
        { frame: 8, type: 'burst', color: WARM, x: 90, y: 70 }], [{ frame: 3, vx: 11 }]),
     // 耙横扫：唯一一记有点攻程的招，用来赶人回到他的抓取距离里
-    s2: { ...mk('bajie_s2', 's2', '耙横扫', 16, [8, 6, 17], 20, [13, 0], 300, 0, [26, 20, 175, 76], 'rush',
+    s2: { ...mk('bajie_s2', 's2', '九齿横耙·扫回去', 16, [8, 6, 17], 20, [13, 0], 300, 0, [26, 20, 175, 76], 'rush',
       [{ frame: 5, type: 'crescent', color: IRON, x: 90, y: 40, size: 50, angle: 0.1 },
        { frame: 9, type: 'spark', color: WARM, x: 160, y: 36 }]), weaponScale: 1.7 },
     // 压顶：他这一组唯一打得倒人的必杀，也是把人按在地上的那一记
-    s3: { ...mk('bajie_s3', 's3', '压顶', 19, [12, 6, 19], 27, [7, 8], 370, 0, [22, 0, 130, 140], 'cast',
+    s3: { ...mk('bajie_s3', 's3', '泰山压顶·人趴下', 19, [12, 6, 19], 27, [7, 8], 370, 0, [22, 0, 130, 140], 'cast',
       [{ frame: 7, type: 'glyph', color: WARM, x: 34, y: 90, size: 38 },
        { frame: 12, type: 'shockwave', color: ROBE, x: 90, y: 0, size: 46 },
        { frame: 16, type: 'burst', color: IRON, x: 100, y: 50 }]), knockdown: true },
     sp50: {
-      id: 'bajie_sp50', slot: 'sp50', name: '奥义·力劈华山', damage: 32,
+      id: 'bajie_sp50', slot: 'sp50', name: '奥义·耙筑山门', damage: 32,
       weaponScale: 2.5,
       startup: ASSAULT_STARTUP, active: ASSAULT_ACTIVE, recovery: ASSAULT_RECOVERY, hitstun: 32,
       knockback: { x: 12, y: 14 }, cooldown: 0, meterCost: 50,

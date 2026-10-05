@@ -5,13 +5,18 @@ import { NULL_INPUT } from '../src/engine/types';
 
 // 近身命中与投射物命中是两条独立的结算路径。后加的规则很容易只落在其中一条上——
 // 实测就漏过两条：反击命中与 MAX 加成都只做在近身那条，
-// 三个角色的投射物（乾坤圈 / 天眼光束 / 怒吼震慑）一概吃不到。
+// 三个角色的投射物（乾坤圈 / 天眼横空 / 震天一吼）一概吃不到。
 
 const SHOOTERS = [
-  { id: 'nezha', slot: 'skill2' as const, name: '乾坤圈' },
-  { id: 'erlang', slot: 'skill1' as const, name: '天眼光束' },
-  { id: 'niumo', slot: 'skill3' as const, name: '怒吼震慑' },
+  { id: 'nezha', slot: 'skill2' as const },
+  { id: 'erlang', slot: 'skill1' as const },
+  { id: 'niumo', slot: 'skill3' as const },
 ];
+/** 报错消息里要说"哪一记没吃到"，招名从数据现取：写死的话改一次招名就得回来补一遍，
+ *  补漏了的那条会指着已经不存在的招式 */
+const SLOT_KEY = { skill1: 's1', skill2: 's2', skill3: 's3' } as const;
+const mv = (id: string, slot: keyof typeof SLOT_KEY) =>
+  CHARACTERS.find(x => x.id === id)!.moves[SLOT_KEY[slot]];
 
 /** 这些招式**自带近身判定框**（最远伸到 340px），对手放得太近的话打中的是那一下、
  * 不是飞出去的实物。间距取 400 就越过了所有人的近身框，只有实物够得着。
@@ -36,9 +41,9 @@ test('三个角色的投射物都打得到人，而且打中的确实是实物�
   for (const s of SHOOTERS) {
     const c = CHARACTERS.find(x => x.id === s.id)!;
     const m = c.moves[s.slot === 'skill1' ? 's1' : s.slot === 'skill2' ? 's2' : 's3'];
-    expect(m.hitbox.x + m.hitbox.w, `${s.name} 的近身框伸到 ${m.hitbox.x + m.hitbox.w}，比 FAR 还远`)
+    expect(m.hitbox.x + m.hitbox.w, `${m.name} 的近身框伸到 ${m.hitbox.x + m.hitbox.w}，比 FAR 还远`)
       .toBeLessThan(FAR);
-    expect(shoot(s.id, s.slot), `${s.name} 一次都没打中`).not.toBeNull();
+    expect(shoot(s.id, s.slot), `${mv(s.id, s.slot).name} 一次都没打中`).not.toBeNull();
   }
 });
 
@@ -46,7 +51,7 @@ test('投射物也吃 MAX 加成——不能只有近身招享受', () => {
   for (const s of SHOOTERS) {
     const plain = shoot(s.id, s.slot)!;
     const maxed = shoot(s.id, s.slot, b => { b.p1.maxMode = 600; })!;
-    expect(maxed.damage, `${s.name} 在 MAX 状态下伤害没变（${plain.damage} → ${maxed.damage}）`)
+    expect(maxed.damage, `${mv(s.id, s.slot).name} 在 MAX 状态下伤害没变（${plain.damage} → ${maxed.damage}）`)
       .toBeGreaterThan(plain.damage);
   }
 });
@@ -54,7 +59,7 @@ test('投射物也吃 MAX 加成——不能只有近身招享受', () => {
 test('投射物也能打出反击命中——对手正在出招时被打中', () => {
   // 站着不动的对手不该算反击
   for (const s of SHOOTERS) {
-    expect(shoot(s.id, s.slot)!.counter, `${s.name} 打中站着不动的人却算了反击`).toBeFalsy();
+    expect(shoot(s.id, s.slot)!.counter, `${mv(s.id, s.slot).name} 打中站着不动的人却算了反击`).toBeFalsy();
   }
   // 让对手不停出招，飞行物落在他的起手/判定帧上就该算反击
   let sawCounter = false, sawHit = false;

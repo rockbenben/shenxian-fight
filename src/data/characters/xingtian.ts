@@ -31,7 +31,7 @@ export const XINGTIAN: CharacterDef = {
     niumo: '两个不用脑子的，比一比谁更不用。',
   },
   vsLose: {
-    zhongkui: '你撞得比我狠。',
+    zhongkui: '你的锁，比我沉。',
     houyi: '箭还是找着我了。',
     niumo: '力气这回合，我输了。',
   },
@@ -67,11 +67,11 @@ export const XINGTIAN: CharacterDef = {
     jA: { ...mk('xingtian_jA', 'jA', '斧坠', 12, [6, 14, 10], 24, [7, 0], 0, 0,
       [2, -34, 100, 94], 'airStrike',
       [{ frame: 6, type: 'spark', color: BRONZE, x: 54, y: 16 }]), guard: 'overhead' },
-    n1: mk('xingtian_n1', 'n1', '斧击', 10, [6, 3, 11], 16, [7, 0], 0, 0, [28, 62, 100, 36], 'thrust',
+    n1: mk('xingtian_n1', 'n1', '挥斧劈', 10, [6, 3, 11], 16, [7, 0], 0, 0, [28, 62, 100, 36], 'thrust',
       [{ frame: 6, type: 'spark', color: BRONZE, x: 92, y: 76 }]),
-    n2: { ...mk('xingtian_n2', 'n2', '扫斧', 11, [5, 3, 12], 16, [8, 0], 0, 0, [22, 0, 108, 48], 'sweep',
+    n2: { ...mk('xingtian_n2', 'n2', '干戚·横扫', 11, [5, 3, 12], 16, [8, 0], 0, 0, [22, 0, 108, 48], 'sweep',
       [{ frame: 5, type: 'spark', color: RUST, x: 92, y: 16 }]), guard: 'low' },
-    n3: mk('xingtian_n3', 'n3', '举斧劈', 15, [7, 4, 15], 24, [8, 9], 0, 0, [26, 30, 96, 116], 'upthrust',
+    n3: mk('xingtian_n3', 'n3', '干戚·下劈', 15, [7, 4, 15], 24, [8, 9], 0, 0, [26, 30, 96, 116], 'upthrust',
       [{ frame: 7, type: 'trail', color: BRONZE, x: 58, y: 86 }, { frame: 9, type: 'burst', color: RUST, x: 62, y: 118 }]),
     // ── 霸体：起手期间**硬吃**几下不进硬直 ──────────────────────────────
     // 引擎此前没有这个概念：所有招式的起手都能被一发普攻打断，因此慢招在贴身战里
@@ -83,25 +83,25 @@ export const XINGTIAN: CharacterDef = {
     // 起手最长的裂地斧也只有 16 帧，而对手一轮普攻（起手4+判定3+收招8）要 15 帧，
     // 连段取消最快也就在起手窗口里塞进两下——第三层永远用不上。
     // 真正的梯度在**起手长度**上：10/13/16 帧，起手越长霸体窗口越久、越可能真的扛到东西。
-    s1: { ...mk('xingtian_s1', 's1', '干戚舞', 17, [10, 6, 16], 22, [11, 0], 260, 0, [26, 24, 160, 110], 'rush',
+    s1: { ...mk('xingtian_s1', 's1', '干戚起舞·扛一下', 17, [10, 6, 16], 22, [11, 0], 260, 0, [26, 24, 160, 110], 'rush',
       [{ frame: 3, type: 'trail', color: RUST, x: 16, y: 60, size: 14 },
        { frame: 7, type: 'crescent', color: BRONZE, x: 90, y: 70, size: 48, angle: -0.3 },
        { frame: 11, type: 'shockwave', color: EARTH, x: 140, y: 0, size: 30 }], [{ frame: 3, vx: 9 }]),
       armor: 1, weaponScale: 1.6 },
     // 撞盾：一步一步顶过去。扛两下——他就是要你打他
-    s2: { ...mk('xingtian_s2', 's2', '撞盾', 15, [13, 6, 18], 22, [16, 0], 300, 0, [22, 20, 140, 120], 'rush',
+    s2: { ...mk('xingtian_s2', 's2', '顶盾直进·不怕', 15, [13, 6, 18], 22, [16, 0], 300, 0, [22, 20, 140, 120], 'rush',
       [{ frame: 4, type: 'shockwave', color: EARTH, x: 40, y: 0, size: 28 },
        { frame: 9, type: 'burst', color: BRONZE, x: 90, y: 60 },
        { frame: 13, type: 'shockwave', color: RUST, x: 130, y: 0, size: 40 }], [{ frame: 4, vx: 7 }, { frame: 10, vx: 6 }]),
       armor: 1 },
     // 裂地斧：全场起手最慢的必杀（16 帧），扛三下。它是"我就站在这里劈，你拦不住"
-    s3: { ...mk('xingtian_s3', 's3', '裂地斧', 20, [16, 6, 20], 28, [10, 10], 380, 0, [24, 0, 150, 150], 'cast',
+    s3: { ...mk('xingtian_s3', 's3', '立地一斧·扛三下', 20, [16, 6, 20], 28, [10, 10], 380, 0, [24, 0, 150, 150], 'cast',
       [{ frame: 8, type: 'glyph', color: RUST, x: 34, y: 90, size: 40 },
        { frame: 16, type: 'shockwave', color: EARTH, x: 100, y: 0, size: 52 },
        { frame: 19, type: 'burst', color: BRONZE, x: 110, y: 50 }]),
       armor: 1, knockdown: true, weaponScale: 1.9 },
     sp50: {
-      id: 'xingtian_sp50', slot: 'sp50', name: '奥义·干戚', damage: 33,
+      id: 'xingtian_sp50', slot: 'sp50', name: '奥义·猛志常在', damage: 33,
       weaponScale: 2.6,
       startup: ASSAULT_STARTUP, active: ASSAULT_ACTIVE, recovery: ASSAULT_RECOVERY, hitstun: 33,
       knockback: { x: 14, y: 13 }, cooldown: 0, meterCost: 50,

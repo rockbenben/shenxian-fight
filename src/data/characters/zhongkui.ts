@@ -71,16 +71,16 @@ export const ZHONGKUI: CharacterDef = {
       [{ frame: 6, type: 'spark', color: VERMILION, x: 54, y: 16 }]), guard: 'overhead' },
     n1: mk('zhongkui_n1', 'n1', '判官笔', 10, [5, 3, 10], 15, [6, 0], 0, 0, [28, 62, 104, 34], 'thrust',
       [{ frame: 5, type: 'spark', color: VERMILION, x: 92, y: 76 }]),
-    n2: { ...mk('zhongkui_n2', 'n2', '扫袍', 10, [5, 3, 11], 15, [7, 0], 0, 0, [22, 0, 110, 46], 'sweep',
+    n2: { ...mk('zhongkui_n2', 'n2', '袍袖·横扫', 10, [5, 3, 11], 15, [7, 0], 0, 0, [22, 0, 110, 46], 'sweep',
       [{ frame: 5, type: 'spark', color: ROBE, x: 92, y: 16 }]), guard: 'low' },
-    n3: mk('zhongkui_n3', 'n3', '挑剑', 14, [6, 4, 14], 23, [7, 10], 0, 0, [26, 38, 92, 112], 'upthrust',
+    n3: mk('zhongkui_n3', 'n3', '剑尖·上挑', 14, [6, 4, 14], 23, [7, 10], 0, 0, [26, 38, 92, 112], 'upthrust',
       [{ frame: 6, type: 'trail', color: VERMILION, x: 58, y: 88 }, { frame: 8, type: 'burst', color: GHOST, x: 62, y: 120 }]),
     // ── 鬼卒：**全场唯一比走路还慢的投射物** ────────────────────────────
     // 现有的弹速全在 5.2~12 之间，而角色走速是 3.8~5.9——也就是说没有人能跟在自己的弹后面走。
     // 鬼卒 vx 2.6：任何人都能走在它前面，他自己更是能贴着它一路压过去。
     // 这才是「召唤」在这套引擎里真正的意思——留下一个在场上替你占位置的东西，
     // 而不是又一发打出去就没了的弹。伤害因此压得很低（8），它的价值是**时间**不是血。
-    s1: { ...mk('zhongkui_s1', 's1', '鬼卒', 10, [11, 5, 16], 16, [5, 0], 270, 0, [30, 30, 90, 70], 'cast',
+    s1: { ...mk('zhongkui_s1', 's1', '鬼卒·替我站着', 10, [11, 5, 16], 16, [5, 0], 270, 0, [30, 30, 90, 70], 'cast',
       [{ frame: 6, type: 'glyph', color: GHOST, x: 26, y: 70, size: 32 },
        { frame: 11, type: 'burst', color: GHOST, x: 70, y: 60 }]),
       projectile: {
@@ -88,16 +88,16 @@ export const ZHONGKUI: CharacterDef = {
         knockback: { x: 6, y: 0 }, w: 46, h: 88, y: 8, kind: 'wraith', color: GHOST,
       } },
     // 镇魂锁：中距离一记横扫，把对手拉进他的节奏。收招长——他压上来是有代价的
-    s2: mk('zhongkui_s2', 's2', '镇魂锁', 16, [9, 6, 18], 20, [10, 0], 300, 0, [28, 40, 175, 80], 'rush',
+    s2: mk('zhongkui_s2', 's2', '镇魂锁·勾你回来', 16, [9, 6, 18], 20, [10, 0], 300, 0, [28, 40, 175, 80], 'rush',
       [{ frame: 3, type: 'trail', color: ROBE, x: 20, y: 70, size: 13 },
        { frame: 7, type: 'crescent', color: VERMILION, x: 100, y: 66, size: 46, angle: 0.15 }], [{ frame: 3, vx: 8 }]),
     // 朱批：他唯一打得倒人的必杀，起手最慢——是"你被鬼卒缠住时"才用得上的那一记
-    s3: { ...mk('zhongkui_s3', 's3', '朱批', 18, [12, 6, 18], 26, [8, 11], 360, 0, [24, 20, 130, 140], 'cast',
+    s3: { ...mk('zhongkui_s3', 's3', '朱批一笔·定勾摄', 18, [12, 6, 18], 26, [8, 11], 360, 0, [24, 20, 130, 140], 'cast',
       [{ frame: 7, type: 'glyph', color: VERMILION, x: 34, y: 90, size: 40 },
        { frame: 12, type: 'burst', color: VERMILION, x: 90, y: 80 },
        { frame: 15, type: 'ring', color: GHOST, x: 96, y: 60, size: 38 }]), knockdown: true, weaponScale: 1.7 },
     sp50: {
-      id: 'zhongkui_sp50', slot: 'sp50', name: '奥义·判官笔', damage: 31,
+      id: 'zhongkui_sp50', slot: 'sp50', name: '奥义·奉旨啖鬼', damage: 31,
       weaponScale: 2.5,
       startup: ASSAULT_STARTUP, active: ASSAULT_ACTIVE, recovery: ASSAULT_RECOVERY, hitstun: 31,
       knockback: { x: 10, y: 14 }, cooldown: 0, meterCost: 50,

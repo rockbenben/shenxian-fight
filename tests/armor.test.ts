@@ -38,7 +38,7 @@ test('霸体招的起手挨打不断——血掉了，动作还在', () => {
   const { b, landed } = hitDuringStartup('s3', 1);
   expect(landed, '压根没挨到打，用例没成立').toBeGreaterThanOrEqual(1);
   expect(b.p1.hp, '挨了打血却没掉——霸体不该免伤').toBeLessThan(xt().hp);
-  expect(b.p1.state, '带 3 层霸体的裂地斧被一下打断了').toBe('attack');
+  expect(b.p1.state, '带 3 层霸体的立地一斧被一下打断了').toBe('attack');
   expect(b.p1.move?.id, '招式被换掉了').toBe('xingtian_s3');
 });
 

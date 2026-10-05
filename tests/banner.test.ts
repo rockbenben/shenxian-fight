@@ -34,7 +34,7 @@ function mockCtx() {
 
 test('计时按 tick() 推进，不是一次性到位或挂渲染帧', () => {
   const b = new BannerSystem();
-  b.showMove('烈焰突刺', 's1', 1, 0);
+  b.showMove('烈焰突刺·细成线', 's1', 1, 0);
   for (let i = 0; i < 39; i++) b.tick();
   expect(b.activeCount()).toBe(1); // 39 次 tick 还没到技能名的 40 tick 寿命，横幅还在
   b.tick(); // 第 40 次
@@ -43,8 +43,8 @@ test('计时按 tick() 推进，不是一次性到位或挂渲染帧', () => {
 
 test('reset() 清空所有横幅（技能名 + 大招卷轴 + 关卡横幅）', () => {
   const b = new BannerSystem();
-  b.showMove('烈焰突刺', 's1', 1, 0);
-  b.showMove('奥义·混天绫', 'sp50', 1, 0);
+  b.showMove('烈焰突刺·细成线', 's1', 1, 0);
+  b.showMove('奥义·混天缚地', 'sp50', 1, 0);
   b.showStage('东海之滨', '哪吒');
   expect(b.activeCount()).toBe(3);
   b.reset();
@@ -61,7 +61,7 @@ test('普攻(n1/n2/n3)不产生横幅', () => {
 
 test('大招竖排逐字揭示：先出第一个字，不是整块出现', () => {
   const b = new BannerSystem();
-  b.showMove('奥义·混天绫', 'sp50', 1, 0);
+  b.showMove('奥义·混天缚地', 'sp50', 1, 0);
   b.tick(); // 只过 1 个逻辑 tick
   const { ctx, fillText } = mockCtx();
   b.drawScreen(ctx);
@@ -70,7 +70,7 @@ test('大招竖排逐字揭示：先出第一个字，不是整块出现', () =>
 
 test('p1/p2 同一 tick 都放大招各占一路槽位，不会互相顶掉', () => {
   const b = new BannerSystem();
-  b.showMove('奥义·混天绫', 'sp50', 1, 0);
+  b.showMove('奥义·混天缚地', 'sp50', 1, 0);
   b.showMove('超必杀·三头六臂', 'sp100', -1, 1);
   expect(b.activeCount()).toBe(2); // 两路大招卷轴都还在，没有一路覆盖另一路
 });
@@ -89,7 +89,7 @@ test('朱砂印编码大招档位：奥义(sp50)盖「奥」，超必杀(sp100)�
 test('最后一关的开场横幅标出来，别的关不标', () => {
   const draw = (final: boolean) => {
     const b = new BannerSystem();
-    b.showStage('积雷山·魔王真身', '牛魔王', '力量 · 耐打', final);
+    b.showStage('积雷山·摩云洞', '牛魔王', '力量 · 耐打', final);
     const { ctx, texts } = textRecorder();
     b.drawScreen(ctx);
     return texts.join('　');
@@ -97,7 +97,7 @@ test('最后一关的开场横幅标出来，别的关不标', () => {
   expect(draw(true), '最后一关没有标记').toContain('最 终 关');
   expect(draw(false), '普通关卡不该标「最终关」').not.toContain('最 终 关');
   // 标记不能顶掉地名与对手名——它是记号，不是主行
-  expect(draw(true), '标了最终关却把地名挤掉了').toContain('积雷山·魔王真身');
+  expect(draw(true), '标了最终关却把地名挤掉了').toContain('积雷山·摩云洞');
   expect(draw(true), '标了最终关却把对手名挤掉了').toContain('牛魔王');
 });
 

@@ -80,26 +80,26 @@ export const LEIZHEN: CharacterDef = {
       [0, -38, 112, 100], 'airStrike',
       [{ frame: 5, type: 'bolt', color: BOLT, x: 56, y: 20, size: 42, angle: 1.3 },
        { frame: 8, type: 'spark', color: CORE, x: 70, y: 10 }]), guard: 'overhead' },
-    n1: mk('leizhen_n1', 'n1', '棍击', 9, [4, 3, 9], 14, [6, 0], 0, 0, [26, 60, 98, 34], 'thrust',
+    n1: mk('leizhen_n1', 'n1', '风雷棍', 9, [4, 3, 9], 14, [6, 0], 0, 0, [26, 60, 98, 34], 'thrust',
       [{ frame: 4, type: 'spark', color: BOLT, x: 88, y: 74 }]),
-    n2: { ...mk('leizhen_n2', 'n2', '扫棍', 10, [4, 3, 10], 15, [7, 0], 0, 0, [22, 0, 104, 46], 'sweep',
+    n2: { ...mk('leizhen_n2', 'n2', '风雷棍·横扫', 10, [4, 3, 10], 15, [7, 0], 0, 0, [22, 0, 104, 46], 'sweep',
       [{ frame: 4, type: 'spark', color: WING, x: 90, y: 16 }]), guard: 'low' },
     // 挑空最高（y 方向击飞 14，全场最高）：他把人挑起来，是为了追到空中去打
-    n3: mk('leizhen_n3', 'n3', '振翅挑', 14, [5, 4, 13], 22, [5, 14], 0, 0, [24, 38, 88, 118], 'upthrust',
+    n3: mk('leizhen_n3', 'n3', '振翅·上挑', 14, [5, 4, 13], 22, [5, 14], 0, 0, [24, 38, 88, 118], 'upthrust',
       [{ frame: 6, type: 'trail', color: WING, x: 56, y: 90 }, { frame: 8, type: 'burst', color: BOLT, x: 60, y: 126 }]),
     // 雷翼冲：斜着俯冲下去的一记突进。判定框压在身体前下方，是"从空中来"的读法
-    s1: mk('leizhen_s1', 's1', '雷翼冲', 17, [8, 6, 16], 20, [12, 0], 240, 0, [24, 30, 170, 96], 'rush',
+    s1: mk('leizhen_s1', 's1', '雷翼斜掠·砸下来', 17, [8, 6, 16], 20, [12, 0], 240, 0, [24, 30, 170, 96], 'rush',
       [{ frame: 2, type: 'trail', color: WING, x: -18, y: 90, size: 15 },
        { frame: 5, type: 'bolt', color: BOLT, x: 50, y: 70, size: 44, angle: 0.9 },
        { frame: 9, type: 'shockwave', color: CORE, x: 120, y: 0, size: 30 }], [{ frame: 2, vx: 15 }]),
     // 风雷双翅：原地拔高的对空。**y 击飞 18 是全场最高**——被它打中的人飞得最高，
     // 而他自己也上去了，正好接上那一记 14 伤害的俯冲
-    s2: { ...mk('leizhen_s2', 's2', '风雷双翅', 16, [7, 6, 18], 24, [3, 18], 300, 0, [10, 24, 96, 168], 'upthrust',
+    s2: { ...mk('leizhen_s2', 's2', '风雷双翅·送上天', 16, [7, 6, 18], 24, [3, 18], 300, 0, [10, 24, 96, 168], 'upthrust',
       [{ frame: 4, type: 'bolt', color: BOLT, x: 26, y: 70, size: 46, angle: 1.4 },
        { frame: 8, type: 'burst', color: WING, x: 34, y: 130 },
        { frame: 12, type: 'ring', color: CORE, x: 30, y: 110, size: 36 }]), knockdown: true },
     // 落雷：唯一一记打地面的招。他在空中占尽便宜，总得有一招是给"对手也在地上"准备的
-    s3: { ...mk('leizhen_s3', 's3', '落雷', 18, [10, 6, 18], 24, [9, 6], 360, 0, [40, 0, 140, 150], 'cast',
+    s3: { ...mk('leizhen_s3', 's3', '一道落雷·打地上', 18, [10, 6, 18], 24, [9, 6], 360, 0, [40, 0, 140, 150], 'cast',
       [{ frame: 7, type: 'glyph', color: CORE, x: 40, y: 150, size: 36 },
        { frame: 11, type: 'bolt', color: BOLT, x: 100, y: 120, size: 60, angle: 1.55 },
        { frame: 14, type: 'shockwave', color: WING, x: 110, y: 0, size: 44 }]), weaponScale: 1.6 },
