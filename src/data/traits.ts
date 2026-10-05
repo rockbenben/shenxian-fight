@@ -1,5 +1,6 @@
 import type { CharacterDef } from '../engine/types';
 import { CHARACTERS } from './characters';
+import { cn } from './cn';
 
 /** 击退：六记地面招里把人推得最远的那一记。traitOf 要用，与 screens.tsx 里那份同源——
  * 这里是**数据层**的那一份，渲染层（banner）也要用，而渲染层不能引 React。 */
@@ -17,11 +18,14 @@ const push = (c: CharacterDef) =>
  * 按"这个角色最特别的一件事"排优先级，取第一条命中的。
  */
 export function traitOf(c: CharacterDef): string {
-  if (c.grapple) return `投技够到 ${c.grapple.range}（常规 52），伤害更高、冷却更短`;
+  // 屏上不说裸的引擎数值：这句原来是「投技够到 78（常规 52）」——78 是像素距离，
+  // 玩家既不知道单位、也不知道 26 的差算大算小。数值留在注释与 characters.test 里。
+  if (c.grapple) return '投技比常规远一截，伤害更高、冷却更短';
   const armored = Object.values(c.moves).filter(m => (m.armor ?? 0) > 0).length;
-  if (armored > 0) return `${armored} 记必杀的起手带霸体：硬吃一下不进硬直`;
+  // 数量一律中文序数：帮助页写的就是「三记必杀」，同一件事不能一处「三」一处「3」
+  if (armored > 0) return `${cn(armored - 1)}记必杀的起手带霸体：硬吃一下不进硬直`;
   const proj = (['s1', 's2', 's3'] as const).filter(k => c.moves[k].projectile).length;
-  if (proj >= 2) return `${proj} 记必杀是飞行道具，可以整局不进近身距离`;
+  if (proj >= 2) return `${cn(proj - 1)}记必杀是飞行道具，可以整局不进近身距离`;
   const guarded = (['s1', 's2', 's3'] as const).filter(k => c.moves[k].guard).length;
   if (guarded >= 2) return '必杀也分上下段：看起来一样，得猜蹲还是站';
   const slowest = Math.min(...CHARACTERS.flatMap(x => (['s1', 's2', 's3'] as const)

@@ -11,3 +11,8 @@ _bak/
 *.log
 __pycache__/
 .claude/
+
+# 打磨稿（design preview）是工作稿：稿子、取景探针、取证实拍。
+# 结论落在提交与代码注释里，稿子本身不入库——入库的那份会立刻开始腐烂。
+design-preview/
+.qoder*

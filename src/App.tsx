@@ -12,8 +12,9 @@ import { createHeld, keyboardBind, toInputFrame } from './ui/input';
 import { mirrorLook } from './render/palette';
 import { startBgm, startMenuBgm, stopBgm } from './render/bgm';
 import { dummyFrame, Help, MuteButton, Result, RotateOverlay, ROUND_NAMES, roundOutcome, ROUNDS_TO_WIN, RoundScore, Select, Title, TrainingBar, type DummyMode } from './ui/screens';
+import { dpFixture, dpRecord } from './ui/dp';
 import { MenuBackdrop } from './ui/MenuBackdrop';
-import { featOf, merge, readRecord, summary, writeRecord } from './ui/records';
+import { featOf, merge, nextStep, readRecord, summary, writeRecord } from './ui/records';
 import { traitOf } from './data/traits';
 import type { CharacterDef, InputFrame, Dir } from './engine/types';
 
@@ -22,27 +23,42 @@ type Scene = { s: 'title' } | { s: 'help' } | { s: 'select'; training?: boolean 
   | { s: 'fight'; me: CharacterDef; stage: number; training?: boolean }
   | { s: 'result'; won: boolean; me: CharacterDef; stage: number };
 
+/** 取景参数 → 起始场景。屏名在 ui/dp.ts 里已经过白名单，这里的 default 只兜"以后加了屏名忘了补" */
+function dpScene(d: NonNullable<ReturnType<typeof dpFixture>>): Scene {
+  switch (d.view) {
+    case 'help': return { s: 'help' };
+    case 'select': return { s: 'select', training: d.training };
+    case 'fight': case 'training':
+      return { s: 'fight', me: d.me, stage: d.stage, training: d.training };
+    case 'result': return { s: 'result', won: d.won, me: d.me, stage: d.stage };
+    default: return { s: 'title' };
+  }
+}
+
 export function App() {
+  /** 打磨稿的取景口子，见 ui/dp.ts。非 DEV 恒为 null，下面每一处 `DP &&` 都只是直通 */
+  const DP = dpFixture();
   // 闯关记录与本趟开始时刻。开始时刻用墙钟：它量的是"玩家花了多久"，不是游戏内的帧数
-  const [rec, setRec] = useState(readRecord);
+  const [rec, setRec] = useState(() => (DP ? dpRecord(DP) : readRecord()));
   /** 选人页选中第几个。放在这里而不是 Select 里：那一页的断言把组件当纯函数调用，
    * 组件内有 hook 就调用不了 */
-  const [pick, setPick] = useState(0);
+  const [pick, setPick] = useState(DP?.pick ?? 0);
   /** 难度档。整趟固定：中途换档会让"闯到第几关"这条记录失去意义 */
-  const [diff, setDiff] = useState(() => readRecord().diff ?? DEFAULT_DIFFICULTY);
+  const [diff, setDiff] = useState(() => DP?.diff ?? readRecord().diff ?? DEFAULT_DIFFICULTY);
   /** 改档立刻写回存档：选了轻松的人不该每次刷新都被丢回标准档 */
   const chooseDiff = (i: number) => {
     setDiff(i);
     const next = { ...rec, diff: i };
-    setRec(next); writeRecord(next);
+    setRec(next);
+    if (!DP) writeRecord(next);   // 夹具态不写盘：稿子里的难度档是真按下去的
   };
-  const runStart = useRef(0);
+  const runStart = useRef(DP ? Date.now() - DP.elapsedMs : 0);
   /** 这一趟的对手编排。种子在**点下角色的那一刻**定，整趟不再变——
    * 刷新页面、重打同一关都必须是同一批对手（buildRun 是纯函数，种子一样结果就一样）。
    * 放 state 而不是 ref：它要参与渲染（关卡名、对手名都从这里取）。 */
-  const [run, setRun] = useState(() => buildRun('', 1, CHARACTERS));
+  const [run, setRun] = useState(() => DP?.run ?? buildRun('', 1, CHARACTERS));
   const [scene, setScene] = useState<Scene>(
-    location.hash === '#training' ? { s: 'select', training: true } : { s: 'title' },
+    () => (DP ? dpScene(DP) : location.hash === '#training' ? { s: 'select', training: true } : { s: 'title' }),
   );
   /** 进入对局的次数，AI 种子的第二个输入（见 aiSeed）。三个入口——开打、下一关、
    * 重打——必须都从这里走：漏掉哪一个，那条路进去的对局就退回"每次都一样的开局"，
@@ -60,6 +76,7 @@ export function App() {
   const inMenu = scene.s !== 'fight';
   useEffect(() => {
     if (!inMenu) return;
+    if (DP) return;   // 夹具态不出声：一张稿子挂着十几格 iframe，十几条菜单音乐同时抢音频名额
     startMenuBgm();
     return stopBgm;
   }, [inMenu]);
@@ -81,6 +98,7 @@ export function App() {
           画布，再压一块只会白烧一份 60fps 的绘制 */}
       {scene.s !== 'fight' && <MenuBackdrop />}
       {scene.s === 'title' && <Title onStart={() => setScene({ s: 'select' })} onTraining={() => setScene({ s: 'select', training: true })} onHelp={() => setScene({ s: 'help' })} record={summary(rec, run.length - 1, CHARACTERS.length, diff, DIFFICULTIES[diff]?.name ?? '')}
+        hint={nextStep(rec, run.length - 1, diff)}
         diff={diff} onDiff={chooseDiff} />}
       {scene.s === 'help' && <Help onBack={() => setScene({ s: 'title' })} />}
       {scene.s === 'select' && (
@@ -109,7 +127,7 @@ export function App() {
             if (!scene.training) {
               const next = merge(rec, scene.stage, won, Date.now() - runStart.current, run.length - 1, scene.me.id, diff);
               setRec(next);
-              writeRecord(next);
+              if (!DP) writeRecord(next);   // 夹具态不写盘：取景格子里的真点击不该改动这名玩家的通关记录
             }
             setScene({ s: 'result', won, me: scene.me, stage: scene.stage });
           }}
@@ -181,10 +199,14 @@ function Fight({ scene, run, diff, attempt, onEnd, onExit }: {
    * 用 state 会多一次重渲染，还得小心和 round 的更新次序 */
   const carried = useRef<[number, number]>([0, 0]);
   const [wins, setWins] = useState<[number, number]>([0, 0]);
-  // 陪练场的对手可以换。正式对局里对手是关卡定死的，这个 state 不会动
-  const [foeId, setFoeId] = useState(stage.bossId);
+  // 陪练场的对手可以换。正式对局里对手是关卡定死的，这个 state 不会动——
+  // 但**夹具那一支例外**：`?dp=fight&foe=X` 要能在正式对局那一屏也换人，否则参数静默
+  // 空转（量过：指 zhongkui 拍出来的是这一关注定的 leizhen，画面看着完全正常）。
+  const DP = dpFixture();
+  const [foeId, setFoeId] = useState(() => DP?.foeId ?? stage.bossId);
+  const bossId = scene.training || DP ? foeId : stage.bossId;
   const battle = useMemo(() => {
-    const boss = structuredClone(CHARACTERS.find(c => c.id === (scene.training ? foeId : stage.bossId))!);
+    const boss = structuredClone(CHARACTERS.find(c => c.id === bossId)!);
     boss.hp = Math.round(boss.hp * RUN_HP_SCALE[scene.stage] * d.hp);
     // 镜像战换色：选牛魔王时末关正是他本人（buildRun 只滤掉玩家与 BOSS 其中之一，
     // 而末关固定是 FINAL_BOSS），陪练场也能选到同一个人。两边配色一模一样时，
@@ -202,6 +224,10 @@ function Fight({ scene, run, diff, attempt, onEnd, onExit }: {
     if (import.meta.env.DEV) (window as unknown as { __battle?: Battle }).__battle = b;
     return b;
   }, [round, foeId]);   // 每个回合（或陪练场换对手）重建一场——血量与位置复位，气槽带过去
+  // 横幅那句机制钩子要拿**名册里那个人**去算：`battle.p2.def` 是被难度乘过的实例，
+  // 而 def.hp 同时是血条的分母，缩放必须留在它身上。轻松档把牛魔王的 215 压到 198，
+  // 他当场就"不是血最厚"了，于是横幅替他念了那句兜底话——说的是孙悟空。
+  const foeBase = CHARACTERS.find(c => c.id === battle.p2.def.id) ?? battle.p2.def;
   const held = useMemo(createHeld, []);
   const prevHeld = useMemo(createHeld, []);
   const ai = useMemo(() => createAi(stage.ai, aiSeed(scene.stage, attempt)), []);
@@ -210,7 +236,7 @@ function Fight({ scene, run, diff, attempt, onEnd, onExit }: {
   const sparAi = useMemo(() => createAi(RUN_AI[1], 31), []);
   // 陪练场的木桩行为。放在 ref 里而不是 state：getP2 每逻辑帧都要读，
   // 用 state 会让每次切挡都重建 GameCanvas 的回调
-  const [dummy, setDummy] = useState<DummyMode>('idle');
+  const [dummy, setDummy] = useState<DummyMode>(() => DP?.dummy ?? 'idle');
   const dummyRef = useRef<DummyMode>('idle');
   dummyRef.current = dummy;
   const dummyInput = (): InputFrame => dummyFrame(dummyRef.current, {
@@ -223,8 +249,10 @@ function Fight({ scene, run, diff, attempt, onEnd, onExit }: {
   // 战斗背景乐：进关开、离开关。陪练场也开——那里待的时间往往比正式对局还长
   // 曲子跟**对手的主场**走（每个人的主场就是一关），速度跟**关卡进度**走。
   // 陪练场没有关卡序号，但一样有对手，所以这里取 p2 而不是 run[scene.stage]
-  useEffect(() => { startBgm(battle.p2.def.id, scene.stage); return stopBgm; },
-    [battle.p2.def.id, scene.stage]);
+  useEffect(() => {
+    if (DP) return;   // 同菜单音乐：夹具态不出声
+    startBgm(battle.p2.def.id, scene.stage); return stopBgm;
+  }, [battle.p2.def.id, scene.stage]);
   // 美术部件是可选增强：探测请求 fire-and-forget，没有 public/chars/ 时静默回退到骨骼胶囊
   useEffect(() => { preloadParts(battle.p1.def.id); preloadParts(battle.p2.def.id); }, [battle]);
   // 外部骨骼动画同样是可选增强：探测 public/skel/<id>.json，没有就一直走程序化动作
@@ -242,7 +270,7 @@ function Fight({ scene, run, diff, attempt, onEnd, onExit }: {
         // 再压一个「最终关」上去就是两个「最终」叠着，读起来别扭
         finalStage={!scene.training && round === 0 && scene.stage === run.length - 1}
         opponentName={scene.training ? undefined : battle.p2.def.name}
-        opponentTrait={scene.training ? undefined : traitOf(battle.p2.def)}
+        opponentTrait={scene.training ? undefined : traitOf(foeBase)}
         // 开场那一句**只在第一回合说**。GameCanvas 挂在 key={round} 上、每回合整体重挂载，
         // 不加这个闸的话三局两胜里同一句话要说两三遍——开场白说第二遍就不是开场白了。
         // 同 finalStage 那一行的分寸（那里也是只认 round === 0）。

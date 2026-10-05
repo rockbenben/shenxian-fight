@@ -1,6 +1,7 @@
 import { expect, test } from 'vitest';
 import { traitOf } from '../src/data/traits';
 import { CHARACTERS } from '../src/data/characters';
+import appSrc from '../src/App.tsx?raw';
 import { BannerSystem } from '../src/render/banner';
 
 // 选人页此前只说定位（「霸体 · 硬吃」）和六根柱子，而定位是个形容词——
@@ -16,11 +17,34 @@ test('每个人都说得出一句，且互不重复', () => {
   expect(dup, `这些句子重复了：${dup.join('、')}——十二个人要有十二处不一样`).toEqual([]);
 });
 
+// 关卡横幅那句钩子取自**名册**，不取自这一场的实例：难度档把 def.hp 乘过
+//（轻松 0.92 把牛魔王的 215 压成 198），而 def.hp 同时是血条的分母、缩放只能留在
+// 它身上。从乘过的实例上算，牛魔王当场"不再是血最厚"，横幅就替他念了兜底句。
+test('横幅的钩子不许从缩放过的实例上算', () => {
+  const m = /opponentTrait=\{([^}]*)\}/.exec(appSrc);
+  expect(m, 'App 里找不到 opponentTrait 那一行——这条断言的锚点过时了').toBeTruthy();
+  expect(m![1], `横幅又从这一场的实例上取数了：「${m![1]}」`).not.toContain('battle.p2.def');
+  expect(m![1], '横幅没按 id 回到名册取那个人').toContain('foeBase');
+});
+
+// 那句兜底话本来是给"真的没有极端项"的人留的。用的人一多，上面那条锚点之外的
+// 同类问题（谁被算成了别人）就会静默过去，所以这里补一把独立的尺
+test('兜底句只说那一个没有极端项的人', () => {
+  const users = CHARACTERS.filter(c => traitOf(c).includes('没有短板')).map(c => c.name);
+  expect(users, `兜底句被 ${users.join('、')} 用上了——他有极端项却没说出来`).toEqual(['孙悟空']);
+});
+
 // **从数据推**而不是各写一句：写死的话数据一改它就开始骗人。
 // 这几条钉住"说的和数据是同一件事"
 test('说的就是数据里真有的那件事', () => {
   const by = (id: string) => traitOf(CHARACTERS.find(c => c.id === id)!);
-  expect(by('bajie'), '投技型没提投技距离').toContain(String(CHARACTERS.find(c => c.id === 'bajie')!.grapple!.range));
+  // 这句原来是把数值直接印上屏（「投技够到 78（常规 52）」），玩家读不出单位与差值大小，
+  // 所以屏上换成「比常规远一截」。证人跟着改成钉**前提**：数据里那一截确实存在，
+  // 而且屏上不该再出现裸数值。
+  const bajie = CHARACTERS.find(c => c.id === 'bajie')!;
+  expect(by('bajie'), '投技型没提投技').toContain('投技');
+  expect(by('bajie'), '钩子又把引擎数值印上屏了').not.toMatch(/\d/);
+  expect(bajie.grapple!.range, '「比常规远一截」的前提没了：投技距离不再高于常规 52').toBeGreaterThan(52);
   expect(by('xingtian'), '霸体型没提霸体').toContain('霸体');
   expect(by('houyi'), '三记弹的没提道具').toContain('道具');
   expect(by('baigu'), '上下段型没提上下段').toContain('上下段');
