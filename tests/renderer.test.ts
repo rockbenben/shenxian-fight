@@ -1,9 +1,9 @@
 import { expect, test } from 'vitest';
 import {
-  capturePrev, draw, drawBg, extendSeg, headAnchor, torsoAnchors, blockArcGeom,
+  capturePrev, draw, drawBg, drawBoneImg, extendSeg, headAnchor, torsoAnchors, blockArcGeom,
   NECK_OVERLAP, WAIST_OVERLAP, TORSO_MOUNT_HALFW, THIGH_LEN, THIGH_W, TAPER,
 } from '../src/render/renderer';
-import { LOGIC_H, LOGIC_W } from '../src/engine/types';
+import { LOGIC_H, LOGIC_W, NULL_INPUT } from '../src/engine/types';
 import { DEFAULT_BG } from '../src/data/stages';
 import { Battle } from '../src/engine/battle';
 import { Camera } from '../src/render/camera';
@@ -164,6 +164,132 @@ test('draw() 在任意相机缩放下都重绘满整块画布，不留下未被�
     draw(ctx, battle, prev, 0, cam, fx, banner, mandorla, null, 0, DEFAULT_BG, viewport);
     expect(isFullyCovered(), `zoom=${zoom} 覆盖率=${(coveredRatio() * 100).toFixed(3)}%，存在从未被本帧任何绘制碰到的区域`).toBe(true);
   }
+});
+
+// ============================================================================
+// 判定框调试叠层：**默认不画**，要看得自己加 `?hitbox=1`。
+//
+// 之前它只挂在 `import.meta.env.DEV` 上，于是开发时每一次出招的生效帧都会在角色身上
+// 盖一层半透明黄绿矩形——玩家反馈"打架的时候会冒出范围框，看起来像 demo"就是它。
+// 生产构建确实裁掉了（实测 bundle 里那串颜色零出现），但开发时它是默认开着的。
+//
+// 走 draw() 全链路而不是直接调 drawFighter（后者不导出）：这条要验的是"默认状态下的
+// 真实渲染里有没有这个东西"，绕过装配层就等于没验。
+// ============================================================================
+const HITBOX_DEBUG_COLOR = 'rgba(255, 224, 102, 0.35)';
+
+/** 记录每一次 fillRect 当时用的 fillStyle */
+function styleTrackingCtx() {
+  const rects: { fill: string; x: number; y: number; w: number; h: number }[] = [];
+  let cur = '';
+  const grad = { addColorStop() {} };
+  const ctx = {
+    save() {}, restore() {}, translate() {}, rotate() {}, scale() {},
+    beginPath() {}, closePath() {}, stroke() {}, fill() {},
+    moveTo() {}, lineTo() {}, arc() {}, ellipse() {}, bezierCurveTo() {}, quadraticCurveTo() {},
+    createLinearGradient() { return grad; }, createRadialGradient() { return grad; },
+    fillText() {}, strokeText() {}, measureText() { return { width: 0 } as TextMetrics; },
+    strokeRect() {}, clip() {}, setLineDash() {}, arcTo() {}, setTransform() {},
+    drawImage() {}, rect() {}, clearRect() {},
+    fillRect(x: number, y: number, w: number, h: number) { rects.push({ fill: cur, x, y, w, h }); },
+    set globalCompositeOperation(_v: string) {}, set globalAlpha(_v: number) {},
+    set fillStyle(v: unknown) { cur = String(v); },
+    set strokeStyle(_v: unknown) {}, set lineWidth(_v: number) {},
+    set font(_v: unknown) {}, set textAlign(_v: unknown) {}, set textBaseline(_v: unknown) {},
+    set lineCap(_v: unknown) {}, set lineJoin(_v: unknown) {}, set filter(_v: unknown) {},
+    set shadowBlur(_v: number) {}, set shadowColor(_v: unknown) {},
+  } as unknown as CanvasRenderingContext2D;
+  return { ctx, rects };
+}
+
+/** 造一个 p1 正在出招、且 stateFrame 落在判定生效窗口内的一场对局 */
+function midAttackBattle() {
+  const battle = new Battle(testChar(), testChar());
+  for (let i = 0; i < 120; i++) {
+    battle.tick({ ...NULL_INPUT, attack: true }, NULL_INPUT);
+    if (battle.p1.state === 'attack' && battle.p1.stateFrame >= battle.p1.move!.startup) break;
+  }
+  return battle;
+}
+
+function countHitboxRects() {
+  const battle = midAttackBattle();
+  const prev = capturePrev(battle);
+  const { ctx, rects } = styleTrackingCtx();
+  draw(ctx, battle, prev, 0, new Camera(), new FxSystem(), new BannerSystem(), new MandorlaSystem(),
+    null, 0, DEFAULT_BG, { w: LOGIC_W, h: LOGIC_H });
+  return rects.filter(r => r.fill === HITBOX_DEBUG_COLOR).length;
+}
+
+test('判定框调试叠层默认不画——打架时不该冒出范围框', () => {
+  const saved = (globalThis as { location?: unknown }).location;
+  delete (globalThis as { location?: unknown }).location;   // 默认态：没有这个 URL 参数
+  try {
+    // 先确认这一帧确实处在判定生效窗口里，否则"没画"可能只是没赶上——
+  // 零矩形要分得清是"没这个功能"还是"没触发"，由下面两条一起看。
+    expect(countHitboxRects(), '判定框叠层默认就画出来了').toBe(0);
+  } finally {
+    if (saved !== undefined) (globalThis as { location?: unknown }).location = saved;
+  }
+});
+
+test('显式加 ?hitbox=1 时判定框叠层画得出来——功能没被顺手删掉', () => {
+  const saved = (globalThis as { location?: unknown }).location;
+  (globalThis as { location?: unknown }).location = { search: '?dp=fight&hitbox=1' };
+  try {
+    expect(countHitboxRects(), '加了 ?hitbox=1 反而画不出判定框——调参的路子断了').toBeGreaterThan(0);
+  } finally {
+    if (saved === undefined) delete (globalThis as { location?: unknown }).location;
+    else (globalThis as { location?: unknown }).location = saved;
+  }
+});
+
+// ============================================================================
+// 受击白闪：贴图要染成**白色剪影**，不能把挂载框刷成白方块。
+//
+// 原来的写法是 drawImage 之后在主画布上叠一层 globalCompositeOperation='source-atop'
+// + fillRect，看着像"只染到贴图已有像素上"。其实不是：source-atop 的定义是"新内容只画在
+// **目标**不透明处"，而目标是整块画布，画布早被关卡背景铺满了——那个 fillRect 覆盖的
+// 整片挂载框全都是不透明的，于是白块直接填满整个框。
+// 屏幕上：躯干一块白方、头一块白方，只有四肢（走 fillTapered 直接填 #fff）是对的。
+// 玩家报的是"被击倒的时候角色变成白框"——击倒招判定框大、白闪正好叠在姿势变化最显眼处，
+// 所以那里最容易撞见，但它其实每一次挨打都在发生。
+//
+// 修法：染色挪到离屏上做（让"目标"只包含这张图），结果作为一张图贴回主画布。
+// 下面把 document 桩出来，好让测试真的走进那条离屏路径——否则它只会走到"非浏览器环境
+// 直接画原图"的兜底分支，这条测试就等于没验到关键那一段。
+// ============================================================================
+test('白闪是白色剪影，不是把挂载框刷成一块白方块', () => {
+  const ops: string[] = [];
+  const grad = { addColorStop() {} };
+  const mkCtx = (tag: string) => new Proxy({} as Record<string, unknown>, {
+    get(_t, k: string) {
+      if (k === 'createLinearGradient' || k === 'createRadialGradient') return () => grad;
+      return (...a: unknown[]) => { ops.push(`${tag}.${k}(${a.map(v => typeof v === 'number' ? v.toFixed(1) : String(v)).join(',')})`); };
+    },
+    set(_t, k: string, v) { ops.push(`${tag}.${k}=${String(v)}`); return true; },
+  }) as unknown as CanvasRenderingContext2D;
+
+  const part = { img: {} as HTMLImageElement, top: 10, bottom: 90, left: 20, right: 100 };
+  const g = globalThis as { document?: unknown };
+  const savedDoc = g.document;
+  g.document = { createElement: () => ({ width: 0, height: 0, getContext: () => mkCtx('scratch') }) };
+  try {
+    drawBoneImg(mkCtx('main'), 100, 100, 100, 160, 20, part, true, 1);
+  } finally {
+    if (savedDoc === undefined) delete g.document; else g.document = savedDoc;
+  }
+
+  // 罪魁祸首：在**主画布**上 source-atop 刷一整块。去掉这条修复，这两条断言立刻变红。
+  expect(ops.filter(o => o.startsWith('main.') && o.includes('source-atop')),
+    '白闪又在主画布上 source-atop 了——挂载框会重新变成白方块').toEqual([]);
+  expect(ops.filter(o => o.startsWith('main.fillRect')),
+    '白闪在主画布上刷了矩形').toEqual([]);
+  // 正确路径的两步都要在：离屏上 source-in 染色，再把结果当图贴回主画布
+  expect(ops.filter(o => o.startsWith('scratch.') && o.includes('source-in')).length,
+    '离屏上没有做 source-in 染色——白闪没被限制在贴图自己的 alpha 里').toBeGreaterThan(0);
+  expect(ops.filter(o => o.startsWith('main.drawImage')).length,
+    '结果没有作为一张图贴回主画布').toBeGreaterThan(0);
 });
 
 // ============================================================================

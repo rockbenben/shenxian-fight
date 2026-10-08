@@ -690,8 +690,8 @@ function poseFor(f: Fighter): Pose {
  * 但贴图画面本身还是原样，非对称素材（武器、偏一侧的花纹）朝向就会不对。所以额外
  * 在 rotate 之后叠一次 ctx.scale(facing, 1)：终点落在本地 x=0 的对称轴上，scale 不
  * 会挪动它（继续精确落在 ex,ey），但 x≠0 的画面内容会跟着整体镜像，与骨骼一起翻面。
- * white 时叠一层不透明白色（source-atop，只染到贴图已有像素上，不会画出轮廓外），
- * 对应受击白闪——胶囊路径是换描边色，贴图没有"描边色"这个概念，只能后处理染色。
+ * white 时把贴图染成不透明白色（对应受击白闪）——胶囊路径是换描边色，贴图没有"描边色"
+ * 这个概念，只能后处理染色。染色走 drawWhitePart，不是在主画布上叠一层，理由见那里。
  * 只取 part.top..part.bottom 这段内容行（parts.ts 已裁掉上下透明留白），横向仍是整张图——
  * 素材自带的留白多少不再影响这一段贴图实际画出来有多高，接缝就不再随素材抖动。
  */
@@ -707,15 +707,55 @@ export function drawBoneImg(ctx: CanvasRenderingContext2D, x: number, y: number,
   // 40*124/160=31 逻辑单位，比程序化躯干的 TORSO_W=38 明显窄一截。更糟的是头部缩放是拿
   // **躯干内容宽**反推的，两个口径不一致，于是 recut.py 里得挂一个 fill=0.80 的常量去凑——
   // 同一个根因被绕了两次。裁了之后 w*2 就是躯干真实宽度，头躯比例才真的是同一个。
-  const { img, top, bottom, left, right } = part;
-  const sw = Math.max(1, right - left);
-  ctx.drawImage(img, left, top, sw, bottom - top, -w, 0, w * 2, len);
-  if (white) {
-    ctx.globalCompositeOperation = 'source-atop';
-    ctx.fillStyle = '#fff';
-    ctx.fillRect(-w, 0, w * 2, len);
-  }
+  const { top, bottom, left, right } = part;
+  const sw = Math.max(1, right - left), sh = Math.max(1, bottom - top);
+  if (white) drawWhitePart(ctx, part, left, top, sw, sh, -w, 0, w * 2, len);
+  else ctx.drawImage(part.img, left, top, sw, sh, -w, 0, w * 2, len);
   ctx.restore();
+}
+
+/**
+ * 把部件图的一段裁片染成纯白（保留 alpha），结果画到 (dx,dy,dw,dh)。
+ *
+ * **不能在主画布上做这件事。** 原来这里是 `drawImage` 之后叠一层
+ * `globalCompositeOperation='source-atop'` + `fillRect`，看着像"只染到贴图已有像素上"——
+ * 其实不是：`source-atop` 的定义是"新内容只画在**目标**不透明的地方"，而目标是**整块画布**，
+ * 画布早被关卡背景铺满了。于是那个 fillRect 覆盖的整片挂载框**全都是不透明的**，
+ * 白块直接填满整个框，素材真正的轮廓被彻底盖掉。
+ *
+ * 屏幕上就是：挨一下，躯干变成一块白方、头变成一块白方，只有四肢（走 fillTapered、
+ * 直接填 #fff、不叠这层）是对的——玩家报的是"被击倒的时候角色变成白框"。
+ * 倒地那一击最容易注意到，是因为击倒招的判定框大、白闪正好叠在姿势变化最明显的地方。
+ *
+ * 正确做法是让"目标"只包含这张图：画到离屏上，在**离屏内部**用 source-in 染色，
+ * 再把结果贴回主画布。整帧只借一块、按素材尺寸复用，不随角色数增长。
+ */
+let flashCanvas: HTMLCanvasElement | null = null;
+let flashCtx: CanvasRenderingContext2D | null = null;
+
+function drawWhitePart(
+  ctx: CanvasRenderingContext2D, part: PartImage,
+  sx: number, sy: number, sw: number, sh: number,
+  dx: number, dy: number, dw: number, dh: number,
+) {
+  const plain = () => ctx.drawImage(part.img, sx, sy, sw, sh, dx, dy, dw, dh);
+  if (typeof document === 'undefined') { plain(); return; }   // 非浏览器环境（单测）
+  if (!flashCanvas) { flashCanvas = document.createElement('canvas'); flashCtx = flashCanvas.getContext('2d'); }
+  const c = flashCtx;
+  // getContext 返回 null（画布数量/内存吃紧时手机 Safari 会）时退回直接画原图：
+  // 白闪这一帧看得见颜色，但不会崩，更不会画出一个白方块。
+  if (!c || !flashCanvas) { plain(); return; }
+  if (flashCanvas.width < sw || flashCanvas.height < sh) {
+    flashCanvas.width = Math.max(flashCanvas.width, sw);
+    flashCanvas.height = Math.max(flashCanvas.height, sh);
+  }
+  c.globalCompositeOperation = 'copy';
+  c.drawImage(part.img, sx, sy, sw, sh, 0, 0, sw, sh);
+  c.globalCompositeOperation = 'source-in';
+  c.fillStyle = '#fff';
+  c.fillRect(0, 0, sw, sh);
+  c.globalCompositeOperation = 'source-over';
+  ctx.drawImage(flashCanvas, 0, 0, sw, sh, dx, dy, dw, dh);
 }
 
 /** 沿骨骼自身方向（(x,y)→(ex,ey) 的连线）延长线段两端，让贴图挂载"重叠"而非"贴边"——两张
@@ -971,19 +1011,17 @@ export function drawLimbs(
     // 包进来的留白手工减掉——一进一出，等价于直接裁。裁了之后内容天然居中，脸没画在
     // 正中也不会歪，那个补偿项从构造上就不需要了。
     const sw = Math.max(1, right - left);
-    const dw = sw * scale, dh = (bottom - top) * scale;
+    const sh = Math.max(1, bottom - top);
+    const dw = sw * scale, dh = sh * scale;
     ctx.save();
     ctx.translate(headCx, headCy);
     ctx.rotate(headAngle); // 部分跟随 lean——顺序与 drawBoneImg 一致：先在世界系里转，
     ctx.scale(fc, 1); // 再镜像贴图内容，镜像不会带偏已经转好的朝向（同 drawBoneImg 的注释）
     // 只取 top..bottom 这段内容行（parts.ts 已裁掉上下透明留白），横向仍是整张图；
-    // 目标矩形的**底边**贴在颈点上（headCy 即颈点），高度由素材自己的比例决定
-    ctx.drawImage(img, left, top, sw, bottom - top, -dw / 2, -dh, dw, dh);
-    if (white) {
-      ctx.globalCompositeOperation = 'source-atop';
-      ctx.fillStyle = '#fff';
-      ctx.fillRect(-dw / 2, -dh, dw, dh);
-    }
+    // 目标矩形的**底边**贴在颈点上（headCy 即颈点），高度由素材自己的比例决定。
+    // 白闪走 drawWhitePart：原来这层 source-atop 染的是整块画布，头会变成一块白方（同 drawBoneImg）
+    if (white) drawWhitePart(ctx, parts.head, left, top, sw, sh, -dw / 2, -dh, dw, dh);
+    else ctx.drawImage(img, left, top, sw, sh, -dw / 2, -dh, dw, dh);
     ctx.restore();
   } else if (headless) {
     // 无头：断首之后以乳为目、以脐为口。不画头，改在躯干上画那三处——
@@ -1084,6 +1122,22 @@ export function weaponHold(p: Pose, x: number, feetY: number, fc: number) {
   const elbow = segEnd(shX, shY, p.armF[0], UPPER_ARM, fc);
   const hand = segEnd(elbow[0], elbow[1], p.armF[0] + p.armF[1], LOWER_ARM, fc);
   return { elbow, hand };
+}
+
+/**
+ * 判定框叠加层要不要画：**默认不画**，要看得自己加 `?hitbox=1`。
+ *
+ * 此前它只挂在 `import.meta.env.DEV` 上，也就是**开发时每一次出招的生效帧都会画**。
+ * 生产构建确实裁掉了（实测 bundle 里 `255,224,102` 零出现），但开发时那层半透明黄绿
+ * 矩形会盖在角色身上——玩家（也就是调参的人自己）一眼看见的是"打起来了冒出个色块"，
+ * 画面读起来像 demo 演示。要调判定框的人加个参数就行，不该让所有人看。
+ *
+ * `import.meta.env.DEV` 仍然留在**使用处**而不是收进这里：vite 只在表达式里遇到
+ * `import.meta.env.DEV === false` 时才把整棵子树裁掉，收进模块级常量就可能被
+ * 跨模块传播挡住，裁不干净反而把调试框发到线上去。
+ */
+function hitboxDebug(): boolean {
+  return typeof location !== 'undefined' && /[?&]hitbox=1/.test(location.search);
 }
 
 /** 兵器尖端的世界坐标，供拖影采样 */
@@ -1393,7 +1447,7 @@ function drawFighter(ctx: CanvasRenderingContext2D, f: Fighter, x: number, y: nu
   const held = isDisarmed(who) ? undefined : f.def.weapon;
   drawLimbs(ctx, p, x, feetY, fc, parts, main, accent, white, held, wScale, wGlow, f.def.headless, f.def.crown);
 
-  if (import.meta.env.DEV && f.state === 'attack' && f.move) { // 判定帧命中框叠加层，直接取自 worldBox，与 checkHit 一致；仅调参用，生产构建裁掉
+  if (import.meta.env.DEV && hitboxDebug() && f.state === 'attack' && f.move) { // 判定帧命中框叠加层，直接取自 worldBox，与 checkHit 一致；生产构建裁掉
     const mv = f.move;
     if (f.stateFrame >= mv.startup && f.stateFrame < mv.startup + mv.active) {
       const hb = worldBox(mv.hitbox, x, feetY, fc);
