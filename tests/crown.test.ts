@@ -96,7 +96,8 @@ test('对局与立绘里那颗头也戴上了——不是只有特写有', () =>
         if ((CALLS as readonly string[]).includes(k)) {
           return (...a: unknown[]) => log.push(`${k}(${a.map(v => typeof v === 'number' ? v.toFixed(1) : String(v)).join(',')})`);
         }
-        if (k === 'createLinearGradient') return () => ({ addColorStop: () => {} });
+        // 径向渐变同桩：drawPortrait 会走到兵器的锤头/金箍
+        if (k === 'createLinearGradient' || k === 'createRadialGradient') return () => ({ addColorStop: () => {} });
         return () => {};
       },
       set() { return true; },

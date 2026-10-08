@@ -109,11 +109,17 @@ const CALLS = ['beginPath', 'moveTo', 'lineTo', 'quadraticCurveTo', 'arc', 'elli
 
 function recorder() {
   const log: string[] = [];
+  const grad = () => ({ addColorStop: () => {} });
   const ctx = new Proxy({} as Record<string, unknown>, {
     get(_t, k: string) {
       if (CALLS.includes(k as typeof CALLS[number])) {
         return (...a: number[]) => log.push(`${k}(${a.map(v => typeof v === 'number' ? v.toFixed(1) : v).join(',')})`);
       }
+      // 渐变要补桩：兵器上大面积部件（斧刃/剑刃/扇面/锤头）现在走 limbGrad/ballGrad
+      // 取体积，不给桩的话 get 返回 undefined，紧接着的 addColorStop 直接 TypeError——
+      // 而这里要验的恰恰是"九种画法两两不同"，挂在异常上就白跑了。
+      // 不进日志：渐变不参与形制差异的判定，桩也不该影响调用序列的比对。
+      if (k === 'createLinearGradient' || k === 'createRadialGradient') return grad;
       return undefined;      // 属性赋值（strokeStyle/lineWidth…）走 set，不进日志
     },
     set() { return true; },

@@ -851,8 +851,11 @@ export function headAnchor(shX: number, shY: number, lean: number, fc: number): 
 /** 关节粗、末端细的锥形笔触路径：两端各带半圆帽，撑出笔锋起收笔的圆润感。
  * 两个 arc 必须走 anticlockwise（true）——不然帽子朝内折回体内而非朝外鼓起，
  * 路径会在端点处自相交，nonzero 填充规则在自交区域算出卷绕数 0，抠出一个洞，
- * 就是关节处那个"黑洞"的成因（洞里透出来的是洞下面早画好的暗色地面）。 */
-function taperedPath(ctx: CanvasRenderingContext2D, x1: number, y1: number, x2: number, y2: number, r1: number, r2: number) {
+ * 就是关节处那个"黑洞"的成因（洞里透出来的是洞下面早画好的暗色地面）。
+ *
+ * capStart=false 时**不画起点那道半圆弧、也不 closePath**：于是路径只描两条侧边加末端
+ * 圆帽，起点处不落墨。填充时永远要圆帽（否则接缝处是个平切的口子），描边时才用这一档。 */
+function taperedPath(ctx: CanvasRenderingContext2D, x1: number, y1: number, x2: number, y2: number, r1: number, r2: number, capStart = true) {
   const angle = Math.atan2(y2 - y1, x2 - x1);
   const perp = angle + Math.PI / 2;
   const cp = Math.cos(perp), sp = Math.sin(perp);
@@ -861,20 +864,109 @@ function taperedPath(ctx: CanvasRenderingContext2D, x1: number, y1: number, x2: 
   ctx.lineTo(x2 + cp * r2, y2 + sp * r2);
   ctx.arc(x2, y2, r2, perp, perp + Math.PI, true);
   ctx.lineTo(x1 - cp * r1, y1 - sp * r1);
-  ctx.arc(x1, y1, r1, perp + Math.PI, perp + Math.PI * 2, true);
-  ctx.closePath();
+  if (capStart) {
+    ctx.arc(x1, y1, r1, perp + Math.PI, perp + Math.PI * 2, true);
+    ctx.closePath();
+  }
 }
 
-/** 填充当前 fillStyle 的锥形笔触，再描一圈 INK.ink 细边让肢体从背景里立起来；
- * 受击白闪时跳过描边——整体已经是纯白，深色边线反而破坏"整体转白"的效果 */
-function fillTapered(ctx: CanvasRenderingContext2D, x1: number, y1: number, x2: number, y2: number, w: number, white: boolean, taper = TAPER) {
-  taperedPath(ctx, x1, y1, x2, y2, w / 2, (w * taper) / 2);
+/** 光从左上斜上方来（屏幕系，未归一化，取用时只用它的方向）。
+ *
+ * 四肢是圆柱，柱面的亮度只取决于**法线与光的夹角**，跟圆柱自己转到哪儿无关——所以
+ * 高光必须按骨轴两侧解算，不能按"世界坐标上/下"平涂。竖着的一根腿和横着的一根腿，
+ * 高光各自落在该落的那一侧；这一条是下面 limbGrad 的立身之本。 */
+const LIGHT = { x: -0.34, y: -0.94 };
+
+/** 明暗差的**下限**。真实光照算下来，竖直肢体两侧的落差只有 0.34（光照方向几乎与
+ * 骨轴平行），照实画等于还是平涂——而角色在屏幕上只有 150px 高、肢体宽 9px，本来
+ * 就没有余量去表现 Lambert 衰减。所以给一个下限：骨轴转到任何角度，受光侧与背光侧
+ * 的明暗差都不小于这个值。圆柱感在小尺寸下靠的是这个差值，不是物理正确。 */
+const MIN_ROUND = 0.62;
+
+/** 沿骨轴两侧的柱体渐变：一根肢体从平涂色管变成有明暗面的圆柱。
+ *
+ * 十二个人的头和躯干都是画出来的厚描边厚涂素材，只有四肢走程序化——此前四肢是一根
+ * 平涂的色管贴在有块面阴影的躯干旁边，读起来像"贴上去的纸片手脚"而不是同一个人身上
+ * 长出来的。这道横向渐变就是把两边统一到同一套上色语汇上，成本只有一次渐变。
+ *
+ * 渐变的两个端点都取在骨轴上：等值线与骨轴平行，所以沿整根肢体亮度恒定，
+ * 起点坐标用 x1/y1 与用中点结果相同。
+ */
+function limbGrad(ctx: CanvasRenderingContext2D, x1: number, y1: number, x2: number, y2: number, w: number, base: string) {
+  const dx = x2 - x1, dy = y2 - y1;
+  const len = Math.hypot(dx, dy) || 1;
+  const vx = -dy / len, vy = dx / len;          // 垂直于骨轴
+  // 可见的两条轮廓边分别对应法线 +v 与 -v，亮度就是 ±dot(v, 光)。取绝对值下限，
+  // 符号决定哪一侧受光——用 dot 而不是比较 vy 的大小，是为了跨过"骨轴竖直"那一刻
+  // 不会突然翻面（一帧亮一帧暗地闪）。
+  const dot = vx * LIGHT.x + vy * LIGHT.y;
+  const k = (dot < 0 ? -1 : 1) * Math.max(Math.abs(dot), MIN_ROUND);
+  const r = (w / 2) * k;
+  const g = ctx.createLinearGradient(x1 + vx * r, y1 + vy * r, x1 - vx * r, y1 - vy * r);
+  g.addColorStop(0, shade(base, 24));
+  g.addColorStop(0.52, base);
+  g.addColorStop(1, shade(base, -26));
+  return g;
+}
+
+/**
+ * 轮廓线颜色：把肢体本色朝墨蓝混一混。
+ *
+ * 十二张躯干 + 十一张头的描边逐张量过（`design-preview/measure-outline2.py`：从轮廓边向内
+ * 走到内部平涂色为止，量这一段的宽度）：**0.50~2.25 逻辑单位，中位 1.25**。
+ * 四肢此前描 2，本来就只是偏厚一点，**不是"粗了四倍"**——我第一版量出来的
+ * "0.3~0.5、粗四倍"是判据坏了的结果（那版按"暗色连续段"数像素，对哪吒直接测不出值，
+ * 一件没测出来就该怀疑判据而不是结论）。
+ *
+ * 真正的原因是**颜色不是一路**：素材描边不是墨蓝，是**同色系压深**的轮廓线
+ * （哪吒是暗红、悟空是深金、铁扇是墨青、二郎是深蓝）。那圈硬邦邦的墨蓝边线贴在同色系的
+ * 躯干旁边，就是"这是贴上去的"这种观感的主要来源——**比粗细更扎眼**。
+ *
+ * 混向墨蓝而不是 `shade(-90)` 直接压暗：压暗会把本来就暗的底色糊成纯黑、丢掉轮廓；
+ * 混过去则保留角色自己的色相，同时拿到足够暗的边。
+ */
+function contourOf(base: string): string {
+  return mixC(base, INK.ink, 0.62);
+}
+
+/** 四肢轮廓线宽度（逻辑单位）。素材描边中位 1.25（见 contourOf 上面的量法），
+ * 原来这里描 2，是整幅画面里最粗的一圈边；收到 1.5 是向素材中位靠拢，
+ * 同时仍留得住边——四肢只有 9~13 宽，真按躯干那个比例取会细到直接糊进背景
+ * （关卡背景大半是暗的），所以不去追求完全相等。 */
+const LIMB_STROKE = 1.5;
+
+/** 填充当前 fillStyle 的锥形笔触，再描一圈轮廓细边让肢体从背景里立起来；
+ * 受击白闪时跳过描边——整体已经是纯白，深色边线反而破坏"整体转白"的效果。
+ *
+ * capStart 透传给描边那一档：见 taperedPath 的注释——省略起点圆帽是为了消掉关节处
+ * 那道横贯的黑带（肘、膝上最显眼）。省掉是安全的，因为起点一定被**下一段更粗的
+ * 骨段或躯干**整个盖住：上臂末端半径 3.0 而小臂起点半径 4.5、大腿末端 3.6 而小腿起点
+ * 5.5、肩髋起点则整个在躯干图之下。
+ *
+ * base 是这一节的**平涂本色**：填充用的是渐变（从渐变里读不出底色），描边色得另算一份，
+ * 所以由调用方显式传进来。
+ */
+function fillTapered(ctx: CanvasRenderingContext2D, x1: number, y1: number, x2: number, y2: number, w: number, white: boolean, taper = TAPER, capStart = true, base = '#000') {
+  const r1 = w / 2, r2 = (w * taper) / 2;
+  taperedPath(ctx, x1, y1, x2, y2, r1, r2);     // 填充要圆帽：起点被平切的话接缝处是个口子
   ctx.fill();
   if (!white) {
-    ctx.strokeStyle = INK.ink;
-    ctx.lineWidth = 2;
+    taperedPath(ctx, x1, y1, x2, y2, r1, r2, capStart);
+    ctx.strokeStyle = contourOf(base);
+    ctx.lineWidth = LIMB_STROKE;
     ctx.stroke();
   }
+}
+
+/** 球面渐变：锤头、金箍这类圆件。受光点沿 LIGHT 偏出去，与四肢的高光同一个方向，
+ * 免得兵器是"别处打光"的。原来它们是一枚平涂的圆片，读起来像贴在杆上的贴纸。 */
+function ballGrad(ctx: CanvasRenderingContext2D, cx: number, cy: number, r: number, base: string) {
+  const g = ctx.createRadialGradient(cx + LIGHT.x * r * 0.5, cy + LIGHT.y * r * 0.5, r * 0.12,
+    cx, cy, r * 1.2);
+  g.addColorStop(0, shade(base, 34));
+  g.addColorStop(0.55, base);
+  g.addColorStop(1, shade(base, -30));
+  return g;
 }
 
 /**
@@ -894,21 +986,61 @@ function drawHand(ctx: CanvasRenderingContext2D, at: [number, number], fill: str
   ctx.arc(at[0], at[1], 6.6, 0, Math.PI * 2);
   ctx.fill();
   if (!white) {
-    ctx.strokeStyle = INK.ink; ctx.lineWidth = 2; ctx.stroke();
-    // 一道指缝：光一个圆仍然像关节，加一笔就读成握着的手
-    ctx.lineWidth = 1.6;
-    ctx.beginPath();
-    ctx.moveTo(at[0] - 3.4, at[1] - 1.2);
-    ctx.lineTo(at[0] + 3.4, at[1] - 1.2);
-    ctx.stroke();
+    ctx.strokeStyle = contourOf(fill); ctx.lineWidth = LIMB_STROKE; ctx.stroke();
+    // 指缝。原来是一道**横贯整个圆的墨色横杠**——在这个尺寸下那道杠比圆还抢眼，
+    // 读出来是"兵器杆上套了个垫圈"，不是手。改成掌缘两道短弧、且用手指自身的暗色
+    // （而不是墨色）描：远看是一道若隐若现的指节线，近看才读得出攥着。
+    ctx.strokeStyle = shade(fill, -78);
+    ctx.lineWidth = 1.3;
+    for (const r of [4.5, 2.0]) {
+      ctx.beginPath();
+      ctx.arc(at[0], at[1], r, -0.72, 0.72);
+      ctx.stroke();
+    }
   }
 }
 
-/** 角色脚下的地面投影：宽度随 def.width，透明度随离地高度衰减，画在角色之前、地面之后 */
+/**
+ * 脚。从小腿末端朝前方长出来的一段楔子。
+ *
+ * 此前腿是一根收尖的笔锋直接怼到地面线上——两根插进地面的柱子，读起来像角色被钉在
+ * 那里，而不是站在那里；一脚踢出去也还是一根棍子。补一只脚之后，静态的重心、
+ * 出招时蹬地的方向感都出来了，成本是一个闭合路径。
+ *
+ * 脚掌是**水平**的、不跟小腿一起转：那是"踩在地上"读法的来源，屈膝时它就该保持平。
+ * 空中翻整圈时脚会随人物整体旋转（roll 是绕髋的刚体变换），此时读作收脚蜷腿，成立。
+ */
+function drawFoot(ctx: CanvasRenderingContext2D, at: [number, number], facing: number, fill: string, white: boolean) {
+  const [x, y] = at;
+  // 脚掌只有 8px 高、15px 长。第一版给了 14 高 × 16 长，出来是两块方砖——脚在
+  // 150px 的角色身上只占很小一块，比例上按"小腿一半粗"去画就已经太大了。
+  const BACK = 4.5, FWD = 11, TOP = 2.8, BOT = 5.2;   // 跟后伸 / 尖前探 / 踝上 / 踝下
+  const boot = shade(fill, -14);                     // 压暗一档：读作鞋，不是袜子
+  ctx.fillStyle = white ? '#fff' : boot;
+  ctx.beginPath();
+  ctx.moveTo(x - facing * BACK, y - TOP);
+  ctx.lineTo(x + facing * FWD, y - TOP * 0.45);
+  ctx.quadraticCurveTo(x + facing * (FWD + 1.5), y + BOT * 0.55, x + facing * (FWD - 2), y + BOT);
+  ctx.lineTo(x - facing * (BACK + 1), y + BOT);
+  ctx.closePath();
+  ctx.fill();
+  if (!white) {
+    ctx.strokeStyle = contourOf(boot); ctx.lineWidth = LIMB_STROKE; ctx.stroke();
+  }
+}
+
+/** 角色脚下的地面投影：宽度随 def.width，透明度随离地高度衰减，画在角色之前、地面之后。
+ *
+ * 用径向渐变而不是平涂椭圆。平涂那版两头一样黑：暗关卡上等于没画（地板本来就是黑的），
+ * 亮关卡上是一枚边缘生硬的黑色补丁。径向渐变中心实、四周淡开，两种背景上都成立。 */
 function drawShadow(ctx: CanvasRenderingContext2D, x: number, y: number, width: number) {
   const t = Math.max(0.15, 1 - y / 150);
   const w = width * 0.9 * (0.7 + t * 0.3);
-  ctx.fillStyle = `rgba(0,0,0,${0.28 * t})`;
+  const g = ctx.createRadialGradient(x, FLOOR_Y, 0, x, FLOOR_Y, w / 2);
+  g.addColorStop(0, `rgba(0,0,0,${0.34 * t})`);
+  g.addColorStop(0.62, `rgba(0,0,0,${0.2 * t})`);
+  g.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = g;
   ctx.beginPath();
   ctx.ellipse(x, FLOOR_Y, w / 2, w / 7, 0, 0, Math.PI * 2);
   ctx.fill();
@@ -919,15 +1051,20 @@ export function segEnd(x: number, y: number, angle: number, len: number, facing:
   return [x + Math.sin(angle) * len * facing, y + Math.cos(angle) * len];
 }
 
+/** 画一节骨段。`fill` 显式传进来而不是读 ctx.fillStyle——回读属性在真实画布上没问题，
+ * 但测试里替身 ctx 的 fillStyle 是个桩（读出来是函数而不是颜色），而这条路径每个角色
+ * 每帧要走八次，不该让渲染的正确性挂在替身身上。 */
 function seg(
   ctx: CanvasRenderingContext2D, x: number, y: number, angle: number, len: number, w: number, facing: number,
-  img?: PartImage, white = false,
+  fill: string, img?: PartImage, white = false,
 ): [number, number] {
   const [ex, ey] = segEnd(x, y, angle, len, facing);
   if (img) {
     drawBoneImg(ctx, x, y, ex, ey, w, img, white, facing);
   } else {
-    fillTapered(ctx, x, y, ex, ey, w, white);
+    ctx.fillStyle = white ? '#fff' : limbGrad(ctx, x, y, ex, ey, w, fill);
+    // capStart=false：起点圆帽不描边，肘/膝上那道横贯的黑带就没了（原因见 fillTapered）
+    fillTapered(ctx, x, y, ex, ey, w, white, TAPER, false, fill);
   }
   return [ex, ey];
 }
@@ -962,14 +1099,23 @@ export function drawLimbs(
 ): void {
   const { hipX, hipY, shX, shY } = torsoAnchors(x, feetY, p.lean, p.crouch, fc);
 
+  // 前臂（袖子）的颜色。此前直接取 accent，而十二个角色的 accent 大多是**近白的浅色**
+  // ——铁扇 #eef3ea、后羿 #f2efe6、雷震子 #f0f4ff、二郎 #e8ecff、白骨精 #e8e4d6。
+  // 拿它画满整条前臂，等于在身上横着贴一条白带子：选人卡的尺寸上它比脸还亮，
+  // 铁扇公主那条斜过胸口的袖子、哪吒那条压在红肚兜上的白胳膊，都是这个毛病
+  // （同一个理由此前已经用在"手"上：手改回 main 之后好了一截，胳膊还留着）。
+  // 对半之后仍然是"浅色袖 + 深衣"的两截配色，角色差异没丢，亮度落回角色自己的色系里。
+  const sleeve = mixC(main, accent, 0.5);
+
   // 每条肢体只有一张图（无分大小臂/大小腿贴图），上下两段共用同一张部件图，
   // 各自按自己的段长/段宽独立挂载
-  ctx.fillStyle = shade(main, -25);
-  let j = seg(ctx, shX, shY, p.armB[0], UPPER_ARM, 11, fc, parts?.armB, white);
-  const handB = seg(ctx, j[0], j[1], p.armB[0] + p.armB[1], LOWER_ARM, 9, fc, parts?.armB, white);
+  const backLimb = shade(main, -25);   // 后侧肢体压暗，靠这层拉开与躯干的纵深
+  let j = seg(ctx, shX, shY, p.armB[0], UPPER_ARM, 11, fc, backLimb, parts?.armB, white);
+  const handB = seg(ctx, j[0], j[1], p.armB[0] + p.armB[1], LOWER_ARM, 9, fc, backLimb, parts?.armB, white);
   if (!parts?.armB) drawHand(ctx, handB, main, white);
-  j = seg(ctx, hipX, hipY, p.legB[0], THIGH, THIGH_W, fc, parts?.legB, white);
-  seg(ctx, j[0], j[1], p.legB[0] - p.legB[1], SHIN, 11, fc, parts?.legB, white);
+  j = seg(ctx, hipX, hipY, p.legB[0], THIGH, THIGH_W, fc, backLimb, parts?.legB, white);
+  const ankB = seg(ctx, j[0], j[1], p.legB[0] - p.legB[1], SHIN, 11, fc, backLimb, parts?.legB, white);
+  if (!parts?.legB) drawFoot(ctx, ankB, fc, backLimb, white);
 
   if (parts?.torso) {
     // 20 = 原胶囊 lineWidth；起点=肩，图片顶部对肩、底部对腰。两端各沿骨骼轴向多伸出
@@ -979,7 +1125,7 @@ export function drawLimbs(
     drawBoneImg(ctx, tx, ty, hx, hy, TORSO_MOUNT_HALFW, parts.torso, white, fc);
   } else if (white) {
     ctx.fillStyle = '#fff';
-    fillTapered(ctx, shX, shY, hipX, hipY, TORSO_W, true); // 白闪时整体转白，跳过渐变与描边
+    fillTapered(ctx, shX, shY, hipX, hipY, TORSO_W, true, TAPER, true, main); // 白闪时整体转白，跳过渐变与描边
   } else {
     const tg = ctx.createLinearGradient(0, shY, 0, hipY); // 竖向渐变：上端 main，下端压暗
     tg.addColorStop(0, main);
@@ -987,7 +1133,7 @@ export function drawLimbs(
     ctx.fillStyle = tg;
     // 肩端粗、髋端细——武人是宽肩窄腰，不是宽臀窄肩的裙摆轮廓（taperedPath 的 x1,y1 是粗的
     // 那头，所以起点传肩不传髋）；TORSO_W 比头部直径 32 明显更宽，肩线撑得起头，不会显小孩
-    fillTapered(ctx, shX, shY, hipX, hipY, TORSO_W, false);
+    fillTapered(ctx, shX, shY, hipX, hipY, TORSO_W, false, TAPER, true, main);
   }
 
   const { cx: headCx, cy: headCy, angle: baseHeadAngle } = headAnchor(shX, shY, p.lean, fc);
@@ -1095,22 +1241,20 @@ export function drawLimbs(
     }
   }
 
-  ctx.fillStyle = main;
-  j = seg(ctx, hipX, hipY, p.legF[0], THIGH, THIGH_W, fc, parts?.legF, white);
-  seg(ctx, j[0], j[1], p.legF[0] - p.legF[1], SHIN, 11, fc, parts?.legF, white);
-  ctx.fillStyle = accent;
-  j = seg(ctx, shX, shY, p.armF[0], UPPER_ARM, 11, fc, parts?.armF, white);
+  j = seg(ctx, hipX, hipY, p.legF[0], THIGH, THIGH_W, fc, main, parts?.legF, white);
+  const ankF = seg(ctx, j[0], j[1], p.legF[0] - p.legF[1], SHIN, 11, fc, main, parts?.legF, white);
+  if (!parts?.legF) drawFoot(ctx, ankF, fc, main, white);
+  j = seg(ctx, shX, shY, p.armF[0], UPPER_ARM, 11, fc, sleeve, parts?.armF, white);
   const elbow = j;
-  j = seg(ctx, j[0], j[1], p.armF[0] + p.armF[1], LOWER_ARM, 9, fc, parts?.armF, white);
+  j = seg(ctx, j[0], j[1], p.armF[0] + p.armF[1], LOWER_ARM, 9, fc, sleeve, parts?.armF, white);
   if (parts?.weapon) { // 有贴图就用贴图
-    seg(ctx, j[0], j[1], p.armF[0] + p.armF[1], 34, 8, fc, parts.weapon, white);
+    seg(ctx, j[0], j[1], p.armF[0] + p.armF[1], 34, 8, fc, main, parts.weapon, white);
   } else if (weapon) { // 否则走程序化兵器：方向取前臂（肘→手）的实际朝向，不重算角度约定
     drawWeapon(ctx, elbow, j, weapon, white, weaponScale, weaponGlow);
   }
   // 手压在兵器之上——顺序就是"握住"这件事本身
-  // 前手用 main，不用 accent。accent 是高光色，多数角色的是接近白的浅色
-  // （后羿 #f2efe6、哪吒 #ffd23f），配上深描边和那道指缝，在选人卡的尺寸上
-  // 成了每个人腰腹上一枚最显眼的浅色贴纸——比脸还抢眼。
+  // 前手用 main，不用 sleeve。accent 是高光色，混半之后仍比身体亮一档，
+  // 在选人卡的尺寸上会成为腰腹上最显眼的一枚浅色贴纸——比脸还抢眼。
   // 后手本来就是 main，两只手不同色也说不通。可读性靠描边和指缝，不靠亮度。
   if (!parts?.armF) drawHand(ctx, j, main, white);
 }
@@ -1179,6 +1323,11 @@ export function drawWeapon(
   const buttX = hand[0] - ux * back, buttY = hand[1] - uy * back;
   const shaft = white ? '#fff' : w.shaft;
   const edge = white ? '#fff' : w.edge;
+  // 兵器与四肢走同一套上色语汇：描边是本色朝墨蓝混（contourOf），大面积的部件给一道
+  // 体积渐变。人物那边刚把硬墨边换成同色系轮廓线，兵器若还留着一圈硬墨蓝，
+  // 就成了"手上那根东西是另一个画师画的"。
+  const outline = (c: string) => (white ? '#fff' : contourOf(c));
+  const solid = (c: string | CanvasGradient) => (white ? '#fff' : c);
 
   // 杆。弓没有杆——它是横着握的，画一根顺前臂的直杆就成了"举着一根棍"，
   // 而弓臂本身就是它的形。所以这一段跳过，下面 bow 那一支自己画弓臂与弦。
@@ -1186,7 +1335,7 @@ export function drawWeapon(
     ctx.strokeStyle = shaft;
     ctx.lineWidth = w.kind === 'mace' ? 8 : w.kind === 'staff' ? 6 : w.kind === 'rake' ? 6 : 5;
     ctx.beginPath(); ctx.moveTo(buttX, buttY); ctx.lineTo(tipX, tipY); ctx.stroke();
-    ctx.strokeStyle = white ? '#fff' : INK.ink;
+    ctx.strokeStyle = outline(shaft);
     ctx.lineWidth = 1.2;
     ctx.beginPath(); ctx.moveTo(buttX, buttY); ctx.lineTo(tipX, tipY); ctx.stroke();
   }
@@ -1212,6 +1361,7 @@ export function drawWeapon(
     }
   } else if (w.kind === 'staff') {   // 如意棒：两端金箍
     for (const e of [[tipX, tipY], [buttX, buttY]] as const) {
+      ctx.fillStyle = solid(ballGrad(ctx, e[0], e[1], 5, edge));
       ctx.beginPath();
       ctx.arc(e[0], e[1], 5, 0, Math.PI * 2);
       ctx.fill();
@@ -1241,8 +1391,11 @@ export function drawWeapon(
     ctx.quadraticCurveTo(tipX - ux * 2 + px * 30, tipY - uy * 2 + py * 30,
       tipX + ux * 11 + px * 7, tipY + uy * 11 + py * 7);
     ctx.lineTo(tipX + ux * 9, tipY + uy * 9);
-    ctx.closePath(); ctx.fill();
-    ctx.strokeStyle = white ? '#fff' : INK.ink; ctx.lineWidth = 1.4; ctx.stroke();
+    ctx.closePath();
+    // 刃面横跨整个斧头，给一道横向渐变才有厚度；平涂时它读作一片贴纸
+    ctx.fillStyle = solid(limbGrad(ctx, tipX - ux * 15, tipY - uy * 15, tipX + ux * 11, tipY + uy * 11, 30, edge));
+    ctx.fill();
+    ctx.strokeStyle = outline(edge); ctx.lineWidth = 1.4; ctx.stroke();
     ctx.fillStyle = edge; tri(tipX + ux * 9, tipY + uy * 9, 9, 3);
   } else if (w.kind === 'sword') {   // 剑：剑格 + 收锋的直刃。刃比杆宽，才不至于看成一根棍
     const gx = hand[0] + ux * 7, gy = hand[1] + uy * 7;
@@ -1250,8 +1403,11 @@ export function drawWeapon(
     ctx.moveTo(gx + px * 4.5, gy + py * 4.5);
     ctx.lineTo(tipX + ux * 11, tipY + uy * 11);
     ctx.lineTo(gx - px * 4.5, gy - py * 4.5);
-    ctx.closePath(); ctx.fill();
-    ctx.strokeStyle = white ? '#fff' : INK.ink; ctx.lineWidth = 1.2; ctx.stroke();
+    ctx.closePath();
+    // 刃是薄片：亮边朝上、暗边朝下，比整片平涂更像一块钢
+    ctx.fillStyle = solid(limbGrad(ctx, gx + px * 4.5, gy + py * 4.5, gx - px * 4.5, gy - py * 4.5, 9, edge));
+    ctx.fill();
+    ctx.strokeStyle = outline(edge); ctx.lineWidth = 1.2; ctx.stroke();
     ctx.strokeStyle = shaft; ctx.lineWidth = 3.4;   // 剑格
     ctx.beginPath();
     ctx.moveTo(gx + px * 10, gy + py * 10);
@@ -1282,8 +1438,11 @@ export function drawWeapon(
       tipX + ux * (blade + 6), tipY + uy * (blade + 6));
     ctx.quadraticCurveTo(tipX + ux * blade - px * spread, tipY + uy * blade - py * spread,
       tipX - ux * 4, tipY - uy * 4);
-    ctx.closePath(); ctx.fill();
-    ctx.strokeStyle = white ? '#fff' : INK.ink; ctx.lineWidth = 1.2; ctx.stroke();
+    ctx.closePath();
+    // 扇面是全场最大的一块平涂，沿展宽方向给一道渐变，扇子才有"面"而不是"片"
+    ctx.fillStyle = solid(limbGrad(ctx, tipX - ux * 4, tipY - uy * 4, tipX + ux * (blade + 6), tipY + uy * (blade + 6), spread * 2, edge));
+    ctx.fill();
+    ctx.strokeStyle = outline(edge); ctx.lineWidth = 1.2; ctx.stroke();
     ctx.strokeStyle = shaft; ctx.lineWidth = 1.4;
     for (const s2 of [-1, 0, 1]) {   // 扇骨
       ctx.beginPath();
@@ -1292,10 +1451,12 @@ export function drawWeapon(
       ctx.stroke();
     }
   } else {                            // 混铁棍：钝重头
+    const mx = tipX + ux * 5, my = tipY + uy * 5;
     ctx.beginPath();
-    ctx.ellipse(tipX + ux * 5, tipY + uy * 5, 11, 8, Math.atan2(uy, ux), 0, Math.PI * 2);
+    ctx.ellipse(mx, my, 11, 8, Math.atan2(uy, ux), 0, Math.PI * 2);
+    ctx.fillStyle = solid(ballGrad(ctx, mx, my, 11, edge));   // 锤头是球面，平涂就是个贴片
     ctx.fill();
-    ctx.strokeStyle = white ? '#fff' : INK.ink; ctx.lineWidth = 1.5; ctx.stroke();
+    ctx.strokeStyle = outline(edge); ctx.lineWidth = 1.5; ctx.stroke();
   }
 }
 
@@ -1583,11 +1744,27 @@ export function blockArcGeom(x: number, feetY: number, fc: number) {
   return { cx: x + fc * 26, cy: feetY - 90, r: 40, a0: base - 1.2, a1: base + 1.2 };
 }
 
-/** 颜色明度偏移，用于后侧肢体压暗 */
+/** 颜色明度偏移，用于后侧肢体压暗、肢体柱体渐变两端 */
 function shade(hex: string, amt: number): string {
-  const n = parseInt(hex.slice(1), 16);
-  const c = (v: number) => Math.min(255, Math.max(0, v + amt));
-  return `rgb(${c(n >> 16)},${c((n >> 8) & 255)},${c(n & 255)})`;
+  return pack(parseC(hex).map(v => v + amt));
+}
+
+/** 两个颜色按 t 混。走 parseC/pack 而不是照抄 adornments.ts 那份 mix——那个模块引
+ * 本模块，在这里反向 import 会成环；两份各写一遍则是同一个式子两处漂移。 */
+export function mixC(a: string, b: string, t: number): string {
+  const A = parseC(a), B = parseC(b);
+  return pack(A.map((v, i) => v + (B[i] - v) * t));
+}
+
+/** #rrggbb 与 rgb(r,g,b) 都要认：palette 里存的是前者，shade() 的返回值是后者，
+ * 而明暗/混色两级都要吃进同一个函数。 */
+function parseC(c: string): [number, number, number] {
+  if (c.charCodeAt(0) === 35) { const n = parseInt(c.slice(1), 16); return [n >> 16, (n >> 8) & 255, n & 255]; }
+  const m = c.match(/\d+/g);
+  return m ? [+m[0], +m[1], +m[2]] : [0, 0, 0];
+}
+function pack(rgb: number[]): string {
+  return `rgb(${rgb.map(v => Math.min(255, Math.max(0, Math.round(v)))).join(',')})`;
 }
 
 // 血条几何：外框 2px ink 描边，2px 内缩为实际内容区

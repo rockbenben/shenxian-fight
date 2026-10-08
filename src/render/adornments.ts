@@ -360,13 +360,23 @@ export function drawAdornments(ctx: CanvasRenderingContext2D, b: Battle, layer: 
       defs.forEach((d, i) => {
         const st = side.sashes[i];
         if (!st || st.pts.length < 2) return;
+        // 梢部第二色要往本色收一收。十二个角色的 tip **几乎全是近白的浅色**——
+        // 铁扇 #eef3ea、悟空 #fff6e0、后羿 #f2efe6、白骨精 #e8e4d6、二郎 #dfe8ff、
+        // 钟馗 #e8d9b0。带子甩出去的时候梢部比脸还亮，再叠上下面那条几乎不收的锥度，
+        // 整条带子在角色旁边横成一枚**近白色的两头钝梭子**——读出来是"飞出去的一把兵器"，
+        // 不是布。这与"前臂直接用 accent 近白色"是同一个病（见 renderer 的 sleeve）。
+        // 对半之后仍是两截渐层，亮度落回角色自己的色系里。
+        const far = d.tip ? mix(d.color, d.tip, 0.45) : d.color;
         ctx.save();
         ctx.lineCap = 'round';
         for (let k = 1; k < st.pts.length; k++) {
           const t = k / (st.pts.length - 1);
-          ctx.strokeStyle = d.tip ? mix(d.color, d.tip, t) : d.color;
-          // 收分只到 55%，不是 25%：带子是**一条带**，收成针尖就成了鞭梢
-          ctx.lineWidth = d.width * (1 - t * 0.45);
+          ctx.strokeStyle = d.tip ? mix(d.color, far, t) : d.color;
+          // 收分走**平方**曲线而不是直线。直线（1 - t*0.45）到梢部还剩 55% 宽，
+          // 于是整条带子的轮廓是一枚两头钝的梭子——恰好是剑刃的形状。
+          // 平方曲线根部几乎不收、末端收到 35%，那才是布的锥度。
+          // 也不能一路收到 25%：那一档实测收成了鞭梢（注释还在），全尖的带子读作皮鞭。
+          ctx.lineWidth = d.width * (1 - 0.65 * t * t);
           ctx.beginPath();
           ctx.moveTo(st.pts[k - 1].x, st.pts[k - 1].y);
           ctx.lineTo(st.pts[k].x, st.pts[k].y);

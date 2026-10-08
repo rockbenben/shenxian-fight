@@ -19,7 +19,9 @@ function trace(def: typeof CHARACTERS[number]): string {
   const log: string[] = [];
   const ctx = new Proxy({} as Record<string, unknown>, {
     get(_t, k: string) {
-      if (k === 'createLinearGradient') {
+      // 径向渐变同桩：立绘里的兵器（锤头/金箍）走 ballGrad，少了这一支 get 返回
+      // undefined，紧接着的 addColorStop 会 TypeError，这条测试挂在异常上而不是断言上
+      if (k === 'createLinearGradient' || k === 'createRadialGradient') {
         // 渐变对象只需要能收 addColorStop；颜色本身进日志，两个人配色不同就分得开
         return (...a: number[]) => {
           log.push(`grad(${a.map(v => v.toFixed(1)).join(',')})`);
