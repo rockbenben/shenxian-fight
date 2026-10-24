@@ -66,7 +66,9 @@ const BONE_MAP: Record<string, [keyof Pose, number?]> = {
 
 const BASE: Pose = {
   lean: 0, crouch: 0, roll: 0, squash: 1, headTilt: 0,
-  armF: [0.2, 0.4], armB: [-0.2, 0.3], legF: [0.15, -0.1], legB: [-0.15, 0.1],
+  // 与 data/motions.ts 的 P() 默认值一致：前腿的膝弯量是正的（膝盖朝后弯），
+  // 负值是反向膝。两处默认值必须一样，否则外部骨骼与程序化动作的站姿会差一截。
+  armF: [0.2, 0.4], armB: [-0.2, 0.3], legF: [0.355, 0.327], legB: [-0.15, 0.1],
 };
 
 const clonePose = (p: Pose): Pose => ({

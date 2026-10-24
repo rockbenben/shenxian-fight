@@ -232,7 +232,7 @@ export function createFighter(def: CharacterDef, x: number, facing: 1 | -1): Fig
     armorLeft: 0, maxMode: 0, charge: 0, escapeAge: 999, escapePrev: false, techPrev: false, techable: true, downByThrow: false, throwCd: 0, landStun: 0, victory: 0,
     buf: {}, bufPrev: {},
     tapDir: 0, tapAge: 99, prevMove: 0, lowGuard: false,
-    invuln: 0, flash: 0, cooldowns: {},
+    invuln: 0, flash: 0, impact: 0, cooldowns: {},
   };
 }
 
@@ -392,6 +392,7 @@ export class Battle {
     if (f.invuln > 0) f.invuln--;
     if (f.throwCd > 0) f.throwCd--;
     if (f.flash > 0) f.flash--;
+    if (f.impact > 0) f.impact--;   // 受击形变：几帧后恢复
     if (f.state !== 'attack') f.facing = foe.x >= f.x ? 1 : -1;
 
     // 双击检测：同一方向在 TAP_WINDOW 帧内按第二次就起跑/后跳。
@@ -1045,7 +1046,12 @@ export class Battle {
     this.events.push({
       type: 'hit', attacker: who, damage: dmg,
       x: hb.x + hb.w / 2, y: hb.y + hb.h / 2, blocked, heavy, counter,
+      // 多段招式的最后一下：渲染层据此加码（更狠的震屏、更大的接触闪光），
+      // 连打才有"越打越重"——每一下都一样轻的话，玩家只觉得是同一个动画在循环
+      final: finalHit,
     });
+    // 受击形变：被打中的那一下沿受力方向拉一下（渲染层读这个计时器）
+    if (!blocked) vic.impact = 4;
     if (vic.hp <= 0) this.declareKo(who, atk);
   }
 

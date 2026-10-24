@@ -14,6 +14,8 @@ interface P {
   alive: boolean; type: FxType;
   x: number; y: number; vx: number; vy: number;
   life: number; max: number; size: number; color: string; angle: number;
+  /** 环类特效的压扁系数（1 = 正圆）。受力方向的冲击环要扁的才读作"被推出去" */
+  sq: number;
 }
 
 const POOL = 256;
@@ -24,7 +26,7 @@ const SHOCK_BASE_SIZE = 6;
 
 export class FxSystem {
   private pool: P[] = Array.from({ length: POOL }, () => ({
-    alive: false, type: 'spark', x: 0, y: 0, vx: 0, vy: 0, life: 0, max: 1, size: 4, color: '#fff', angle: 0,
+    alive: false, type: 'spark', x: 0, y: 0, vx: 0, vy: 0, life: 0, max: 1, size: 4, color: '#fff', angle: 0, sq: 1,
   }));
   flashAlpha = 0; // 全屏白闪，draw 后由 GameCanvas 叠加
   private flashHold = 0; // 白闪维持满亮度的剩余 tick 数，过完才开始衰减——按 tick 推进，非渲染帧
@@ -38,17 +40,25 @@ export class FxSystem {
     return null;
   }
 
-  spawn(type: FxType, x: number, y: number, o: { color: string; size?: number; angle?: number } = { color: '#fff' }) {
+  spawn(type: FxType, x: number, y: number, o: {
+    color: string; size?: number; angle?: number;
+    /** 环类特效的压扁系数（1 = 正圆） */
+    sq?: number;
+    /** shard 的数量与张角 */
+    count?: number; spread?: number;
+  } = { color: '#fff' }) {
     // flash 复用 size 字段表达"额外维持满亮度多少 tick"——省得为一个可选参数单开一条 spawn 分支；
     // 调用方不传就是 0（原行为：立刻开始按固定速率衰减）
     if (type === 'flash') { this.flashAlpha = 0.7; this.flashHold = o.size ?? 0; return; }
-    const count = type === 'burst' ? 14 : type === 'shockwave' ? 3 : type === 'spark' ? 6 : 1;
+    const count = type === 'burst' ? 14 : type === 'shockwave' ? 3 : type === 'spark' ? 6
+      : type === 'shard' ? (o.count ?? 6) : 1;
     for (let i = 0; i < count; i++) {
       const p = this.take();
       if (!p) return;
       p.alive = true; p.type = type; p.x = x; p.y = y;
       p.color = o.color; p.angle = o.angle ?? 0;
       p.size = o.size ?? 6;
+      p.sq = o.sq ?? 1;
       p.vx = 0; p.vy = 0;
       switch (type) {
         case 'burst': {
@@ -64,6 +74,24 @@ export class FxSystem {
           p.life = p.max = 14;
           break;
         }
+        case 'shard': {
+          // 方向性亮片：沿受力方向甩出去，角度上散开一点。
+          // 对称的圆点粒子读起来是"放烟火"，沿着受力方向的亮片才是"这一下打在身上"。
+          const a = p.angle + (Math.random() - 0.5) * (o.spread ?? 0.9);
+          const sp = 7 + Math.random() * 8;
+          p.vx = Math.cos(a) * sp;
+          p.vy = Math.sin(a) * sp;
+          p.life = p.max = 9 + Math.random() * 6;
+          p.size = o.size ?? 3;
+          break;
+        }
+        case 'hitflash':
+          // 接触点闪光：命中点最亮的那一下，越亮越快收
+          p.life = p.max = 7;
+          break;
+        case 'impactring':
+          p.life = p.max = 14;
+          break;
         case 'ring': p.life = p.max = 22; break;
         case 'shockwave': p.life = p.max = 16 + i * 6; break;
         case 'beam': p.life = p.max = 14; p.size = o.size ?? 40; break;
@@ -135,6 +163,44 @@ export class FxSystem {
         case 'spark':
           ctx.beginPath(); ctx.arc(p.x, p.y, p.size * t, 0, Math.PI * 2); ctx.fill();
           break;
+        case 'hitflash': {
+          // 接触点闪光：命中点最亮的那一小团白。普通命中只画一圈渐开的粒子时，
+          // 玩家看到的是"一团烟花"；真正让人知道"打中了"的是接触点本身爆开的一下。
+          // 半径要小：它是"一点"，不是"一片"——糊大了就把半个身子盖住，反而不像命中
+          const r = p.size * (0.3 + t * 0.8);
+          const g = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, r);
+          g.addColorStop(0, hexAlpha('#ffffff', 0.95 * t));
+          g.addColorStop(0.4, hexAlpha(p.color, 0.55 * t));
+          g.addColorStop(1, hexAlpha(p.color, 0));
+          ctx.fillStyle = g;
+          ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, Math.PI * 2); ctx.fill();
+          break;
+        }
+        case 'shard': {
+          // 方向性亮片：一道沿速度方向拉长的细亮线，尾端拖在后面
+          const sp = Math.hypot(p.vx, p.vy) || 1;
+          const len = 7 + sp * 1.5;
+          const dx = (p.vx / sp) * len, dy = (p.vy / sp) * len;
+          ctx.lineCap = 'round';
+          ctx.lineWidth = Math.max(0.8, p.size * 0.5 * t);
+          ctx.beginPath();
+          ctx.moveTo(p.x, p.y);
+          ctx.lineTo(p.x - dx, p.y - dy);
+          ctx.stroke();
+          break;
+        }
+        case 'impactring': {
+          // 受力方向的压扁冲击环：环是圆的读作"气"，压扁的才读作"被推出去"
+          const r = (1 - t) * (34 + p.size * 6);
+          ctx.save();
+          ctx.translate(p.x, p.y);
+          ctx.rotate(p.angle);
+          ctx.scale(1, p.sq);
+          ctx.lineWidth = 5 * t;
+          ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.stroke();
+          ctx.restore();
+          break;
+        }
         case 'ring': {
           ctx.lineWidth = 4 * t;
           const r = (1 - t) * 120;

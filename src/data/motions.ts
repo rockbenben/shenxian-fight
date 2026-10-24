@@ -3,7 +3,15 @@ import { buildAssault, buildBrief, buildReactions, buildSuper, ERLANG_VOCAB, NEZ
 
 const P = (over: Partial<Pose>): Pose => ({
   lean: 0, crouch: 0, roll: 0, squash: 1, headTilt: 0,
-  armF: [0.2, 0.4], armB: [-0.2, 0.3], legF: [0.15, -0.1], legB: [-0.15, 0.1],
+  // 默认姿势的前腿：膝弯量取 +0.327（不是负的）——负值是小腿朝前折的反向膝。
+  // 这一对角度是 IK 解出来的：脚落在髋前 12、脚踩在地面下 62，膝盖落在髋前 11。
+  // 此前 legF[1] = −0.1，两处都不对：膝盖朝前折，脚也离地半像素。
+  //
+  // 默认手臂的肩角 0.14：手臂挂在**近肩**上、向前斜出手，兵器顺着手臂的方向画出去，
+  // 于是兵器是斜指前下方的（收在身侧的那一段会被腿挡住）。此前试过把肩角收到 0.08
+  // 让手臂垂直垂下，结果兵器整个埋进腿里看不见了——垂得下去不等于看着对。
+  // 0.2 又偏大：手臂会斜扫过胸口；0.14 是两头之间的值，垂手时手落在身侧、兵器仍在前下方。
+  armF: [0.14, 0.3], armB: [-0.2, 0.3], legF: [0.355, 0.327], legB: [-0.15, 0.1],
   ...over,
 });
 
@@ -23,10 +31,10 @@ export const MOTIONS: Record<string, Motion> = {
       // 蓄：再压一下，蓄势起身
       { t: 16, pose: P({ crouch: 11, lean: 0.18, armF: [0.15, 1.05], armB: [0.05, 0.85] }), ease: 'accel' },
       // 起：前臂抡上去，身子挺开，下巴抬起
-      { t: 38, pose: P({ crouch: -2, lean: -0.1, headTilt: -0.14, armF: [1.45, 0.25], armB: [-0.5, 0.3], legF: [0.12, -0.1] }), ease: 'snap' },
+      { t: 38, pose: P({ crouch: -2, lean: -0.1, headTilt: -0.14, armF: [1.45, 0.25], armB: [-0.5, 0.3], legF: [0.22, 0.1] }), ease: 'snap' },
       // 定：略微回落坐定，这就是摆住的造型
-      { t: 60, pose: P({ crouch: 0, lean: -0.05, headTilt: -0.1, armF: [1.28, 0.32], armB: [-0.42, 0.28], legF: [0.1, -0.08] }), ease: 'decel' },
-      { t: 100, pose: P({ crouch: 0, lean: -0.05, headTilt: -0.1, armF: [1.28, 0.32], armB: [-0.42, 0.28], legF: [0.1, -0.08] }) },
+      { t: 60, pose: P({ crouch: 0, lean: -0.05, headTilt: -0.1, armF: [1.28, 0.32], armB: [-0.42, 0.28], legF: [0.18, 0.08] }), ease: 'decel' },
+      { t: 100, pose: P({ crouch: 0, lean: -0.05, headTilt: -0.1, armF: [1.28, 0.32], armB: [-0.42, 0.28], legF: [0.18, 0.08] }) },
     ],
   },
   // ── 四人各自的胜利姿势 ────────────────────────────────────────────
@@ -41,8 +49,8 @@ export const MOTIONS: Record<string, Motion> = {
       { t: 0, pose: P({ crouch: 5, lean: 0.12, armF: [0.45, 0.85], armB: [0.2, 0.6] }), ease: 'decel' },
       { t: 14, pose: P({ crouch: 9, lean: 0.2, armF: [-0.5, 0.6], armB: [0.35, 0.7] }), ease: 'accel' },
       { t: 30, pose: P({ crouch: -3, lean: -0.06, headTilt: -0.1, armF: [2.3, 0.35], armB: [-0.7, 0.4] }), ease: 'snap' },
-      { t: 52, pose: P({ crouch: 0, lean: -0.12, headTilt: -0.18, armF: [0.95, 0.3], armB: [-1.05, 0.25], legF: [0.16, -0.12] }), ease: 'decel' },
-      { t: 100, pose: P({ crouch: 0, lean: -0.12, headTilt: -0.18, armF: [0.95, 0.3], armB: [-1.05, 0.25], legF: [0.16, -0.12] }) },
+      { t: 52, pose: P({ crouch: 0, lean: -0.12, headTilt: -0.18, armF: [0.95, 0.3], armB: [-1.05, 0.25], legF: [0.28, 0.12] }), ease: 'decel' },
+      { t: 100, pose: P({ crouch: 0, lean: -0.12, headTilt: -0.18, armF: [0.95, 0.3], armB: [-1.05, 0.25], legF: [0.28, 0.12] }) },
     ],
   },
 
@@ -53,8 +61,8 @@ export const MOTIONS: Record<string, Motion> = {
       { t: 0, pose: P({ crouch: 6, lean: 0.1, armF: [0.5, 0.8], armB: [0.15, 0.6] }), ease: 'decel' },
       { t: 18, pose: P({ crouch: 2, lean: -0.05, armF: [1.9, 0.5], armB: [-0.4, 0.4] }), ease: 'snap' },
       { t: 36, pose: P({ crouch: 4, lean: 0.06, headTilt: 0.12, armF: [1.15, 1.35], armB: [-0.3, 0.35] }), ease: 'decel' },
-      { t: 58, pose: P({ crouch: 6, lean: 0.02, headTilt: -0.08, armF: [1.1, 1.3], armB: [1.25, 1.5], legF: [0.22, -0.16] }), ease: 'decel' },
-      { t: 100, pose: P({ crouch: 6, lean: 0.02, headTilt: -0.08, armF: [1.1, 1.3], armB: [1.25, 1.5], legF: [0.22, -0.16] }) },
+      { t: 58, pose: P({ crouch: 6, lean: 0.02, headTilt: -0.08, armF: [1.1, 1.3], armB: [1.25, 1.5], legF: [0.38, 0.16] }), ease: 'decel' },
+      { t: 100, pose: P({ crouch: 6, lean: 0.02, headTilt: -0.08, armF: [1.1, 1.3], armB: [1.25, 1.5], legF: [0.38, 0.16] }) },
     ],
   },
 
@@ -65,8 +73,8 @@ export const MOTIONS: Record<string, Motion> = {
       { t: 0, pose: P({ crouch: 10, lean: 0.14, armF: [0.5, 0.8], armB: [0.2, 0.6] }), ease: 'decel' },
       { t: 12, pose: P({ crouch: 20, lean: 0.34, armF: [1.5, 0.2], armB: [-0.3, 0.4] }), ease: 'snap' },
       { t: 30, pose: P({ crouch: 12, lean: -0.08, headTilt: 0.16, armF: [1.35, 0.15], armB: [1.1, 1.4] }), ease: 'decel' },
-      { t: 54, pose: P({ crouch: 8, lean: -0.14, headTilt: 0.2, armF: [1.3, 0.12], armB: [0.3, 0.5], legF: [0.2, -0.14] }), ease: 'decel' },
-      { t: 100, pose: P({ crouch: 8, lean: -0.14, headTilt: 0.2, armF: [1.3, 0.12], armB: [0.3, 0.5], legF: [0.2, -0.14] }) },
+      { t: 54, pose: P({ crouch: 8, lean: -0.14, headTilt: 0.2, armF: [1.3, 0.12], armB: [0.3, 0.5], legF: [0.34, 0.14] }), ease: 'decel' },
+      { t: 100, pose: P({ crouch: 8, lean: -0.14, headTilt: 0.2, armF: [1.3, 0.12], armB: [0.3, 0.5], legF: [0.34, 0.14] }) },
     ],
   },
   // 三昧真火：深吸一口气（整个人缩起来），然后整个上身前倾把火吐出去
@@ -85,12 +93,12 @@ export const MOTIONS: Record<string, Motion> = {
     loop: false, frames: 52,
     keys: [
       { t: 0, pose: P({ crouch: 12, lean: 0.06, armF: [0.6, 0.5], armB: [-0.5, 0.5] }) },
-      { t: 7, pose: P({ crouch: 28, lean: -0.3, armF: [-0.6, 0.7], armB: [0.5, 0.7], legF: [0.65, -1.0], legB: [-0.55, -0.85] }) },
-      { t: 13, pose: P({ crouch: 6, lean: -0.44, roll: 0.5, armF: [-1.0, 0.3], armB: [-0.8, 0.35], legF: [0.85, -1.35] }) }, // 卷火
-      { t: 16, pose: P({ lean: -0.28, roll: 1.1, armF: [2.7, 0.25], armB: [2.5, 0.3], legF: [0.95, -1.45], legB: [-0.7, -1.1] }) },
-      { t: 21, pose: P({ lean: 0.14, armF: [3.1, 0.04], armB: [2.95, 0.06], legF: [0.75, -1.2], legB: [-0.5, -0.9] }) },
-      { t: 25, pose: P({ lean: 0.5, armF: [1.5, 0.05], armB: [1.4, 0.06], legF: [0.5, -0.6], legB: [-0.3, -0.3] }) },
-      { t: 30, pose: P({ crouch: 26, lean: 0.6, armF: [0.8, 0.08], armB: [0.78, 0.1], legF: [0.55, -0.12], legB: [-0.45, 0.18] }) },
+      { t: 7, pose: P({ crouch: 28, lean: -0.3, armF: [-0.6, 0.7], armB: [0.5, 0.7], legF: [1.65, 1], legB: [0.3, 0.85] }) },
+      { t: 13, pose: P({ crouch: 6, lean: -0.44, roll: 0.5, armF: [-1.0, 0.3], armB: [-0.8, 0.35], legF: [2.2, 1.35] }) }, // 卷火
+      { t: 16, pose: P({ lean: -0.28, roll: 1.1, armF: [2.7, 0.25], armB: [2.5, 0.3], legF: [2.4, 1.45], legB: [0.4, 1.1] }) },
+      { t: 21, pose: P({ lean: 0.14, armF: [3.1, 0.04], armB: [2.95, 0.06], legF: [1.95, 1.2], legB: [0.4, 0.9] }) },
+      { t: 25, pose: P({ lean: 0.5, armF: [1.5, 0.05], armB: [1.4, 0.06], legF: [1.1, 0.6], legB: [0, 0.3] }) },
+      { t: 30, pose: P({ crouch: 26, lean: 0.6, armF: [0.8, 0.08], armB: [0.78, 0.1], legF: [0.67, 0.12], legB: [-0.45, 0.18] }) },
       { t: 40, pose: P({ crouch: 10, lean: 0.22, armF: [0.5, 0.3], armB: [-0.2, 0.3] }) },
       { t: 52, pose: P({ crouch: 8, armF: [0.3, 0.4], armB: [-0.2, 0.3], lean: 0.08 }) },
     ],
@@ -102,8 +110,8 @@ export const MOTIONS: Record<string, Motion> = {
       { t: 0, pose: P({ crouch: 4, lean: 0.06, armF: [0.5, 0.7], armB: [-0.4, 0.6] }), ease: 'decel' },
       { t: 16, pose: P({ crouch: 8, lean: -0.04, armF: [-1.4, 0.85], armB: [1.3, 0.8] }), ease: 'accel' },
       { t: 32, pose: P({ crouch: 2, lean: 0.02, headTilt: -0.12, armF: [1.6, 0.3], armB: [-1.5, 0.34] }), ease: 'snap' },
-      { t: 56, pose: P({ crouch: 4, lean: 0, headTilt: -0.16, armF: [0.85, 0.55], armB: [-0.5, 0.4], legF: [0.16, -0.1] }), ease: 'decel' },
-      { t: 100, pose: P({ crouch: 4, lean: 0, headTilt: -0.16, armF: [0.85, 0.55], armB: [-0.5, 0.4], legF: [0.16, -0.1] }) },
+      { t: 56, pose: P({ crouch: 4, lean: 0, headTilt: -0.16, armF: [0.85, 0.55], armB: [-0.5, 0.4], legF: [0.26, 0.1] }), ease: 'decel' },
+      { t: 100, pose: P({ crouch: 4, lean: 0, headTilt: -0.16, armF: [0.85, 0.55], armB: [-0.5, 0.4], legF: [0.26, 0.1] }) },
     ],
   },
   // 一扇之威：扇面后引到极限，再横着扫出去——全程不移动重心
@@ -138,8 +146,8 @@ export const MOTIONS: Record<string, Motion> = {
       { t: 0, pose: P({ crouch: 22, lean: 0.3, armF: [1.4, 0.2], armB: [1.2, 0.25] }), ease: 'decel' },
       { t: 22, pose: P({ crouch: 14, lean: 0.06, armF: [0.5, 0.5], armB: [-0.4, 0.45] }), ease: 'linear' },
       { t: 44, pose: P({ crouch: 2, lean: -0.1, headTilt: -0.2, armF: [-0.3, 0.6], armB: [0.25, 0.55] }), ease: 'decel' },
-      { t: 62, pose: P({ crouch: 0, lean: -0.14, headTilt: -0.24, armF: [0.7, 0.35], armB: [-0.6, 0.3], legF: [0.14, -0.1] }), ease: 'decel' },
-      { t: 100, pose: P({ crouch: 0, lean: -0.14, headTilt: -0.24, armF: [0.7, 0.35], armB: [-0.6, 0.3], legF: [0.14, -0.1] }) },
+      { t: 62, pose: P({ crouch: 0, lean: -0.14, headTilt: -0.24, armF: [0.7, 0.35], armB: [-0.6, 0.3], legF: [0.24, 0.1] }), ease: 'decel' },
+      { t: 100, pose: P({ crouch: 0, lean: -0.14, headTilt: -0.24, armF: [0.7, 0.35], armB: [-0.6, 0.3], legF: [0.24, 0.1] }) },
     ],
   },
   // 白骨爪：整个人贴到地面，一爪从下方撩上来
@@ -160,10 +168,10 @@ export const MOTIONS: Record<string, Motion> = {
       { t: 0, pose: P({ crouch: 12, lean: 0.02, armF: [0.6, 0.5], armB: [-0.5, 0.45] }) },
       { t: 7, pose: P({ crouch: 28, lean: -0.34, armF: [-2.0, 0.4], armB: [-1.8, 0.45] }) },
       { t: 12, pose: P({ crouch: 20, lean: -0.2, roll: -0.5, armF: [-2.4, 0.3], armB: [-2.2, 0.35] }) },
-      { t: 16, pose: P({ crouch: 4, lean: -0.3, armF: [-2.2, 0.3], armB: [-2.0, 0.34], legF: [0.22, -0.9] }) },
-      { t: 21, pose: P({ lean: -0.14, armF: [2.8, 0.2], armB: [2.5, 0.26], legF: [0.9, -1.35], legB: [-0.65, -1.05] }) },
-      { t: 26, pose: P({ lean: 0.44, armF: [1.5, 0.05], armB: [1.3, 0.08], legF: [0.5, -0.6] }) },
-      { t: 31, pose: P({ crouch: 28, lean: 0.5, armF: [0.75, 0.06], armB: [0.72, 0.1], legF: [0.5, -0.1] }) },
+      { t: 16, pose: P({ crouch: 4, lean: -0.3, armF: [-2.2, 0.3], armB: [-2.0, 0.34], legF: [1.12, 0.9] }) },
+      { t: 21, pose: P({ lean: -0.14, armF: [2.8, 0.2], armB: [2.5, 0.26], legF: [2.25, 1.35], legB: [0.4, 1.05] }) },
+      { t: 26, pose: P({ lean: 0.44, armF: [1.5, 0.05], armB: [1.3, 0.08], legF: [1.1, 0.6] }) },
+      { t: 31, pose: P({ crouch: 28, lean: 0.5, armF: [0.75, 0.06], armB: [0.72, 0.1], legF: [0.6, 0.1] }) },
       { t: 42, pose: P({ crouch: 16, lean: 0.16, armF: [0.6, 0.4], armB: [-0.4, 0.35] }) },
       { t: 52, pose: P({ crouch: 10, lean: 0.02, armF: [0.5, 0.5], armB: [-0.4, 0.45] }) },
     ],
@@ -175,8 +183,8 @@ export const MOTIONS: Record<string, Motion> = {
       { t: 0, pose: P({ crouch: 2, lean: 0.08, armF: [2.3, 0.3], armB: [-1.6, 0.35] }), ease: 'decel' },
       { t: 20, pose: P({ crouch: 0, lean: 0.02, armF: [2.0, 0.5], armB: [-0.9, 0.4] }), ease: 'linear' },
       { t: 40, pose: P({ crouch: 0, lean: -0.06, headTilt: -0.22, armF: [0.9, 0.7], armB: [-0.5, 0.4] }), ease: 'decel' },
-      { t: 60, pose: P({ crouch: 2, lean: -0.08, headTilt: -0.26, armF: [0.5, 0.75], armB: [-0.4, 0.35], legF: [0.14, -0.08] }), ease: 'decel' },
-      { t: 100, pose: P({ crouch: 2, lean: -0.08, headTilt: -0.26, armF: [0.5, 0.75], armB: [-0.4, 0.35], legF: [0.14, -0.08] }) },
+      { t: 60, pose: P({ crouch: 2, lean: -0.08, headTilt: -0.26, armF: [0.5, 0.75], armB: [-0.4, 0.35], legF: [0.22, 0.08] }), ease: 'decel' },
+      { t: 100, pose: P({ crouch: 2, lean: -0.08, headTilt: -0.26, armF: [0.5, 0.75], armB: [-0.4, 0.35], legF: [0.22, 0.08] }) },
     ],
   },
   // 射日：拉满、屏住、放。整段几乎没有位移，全部张力在两只手臂的反向拉开上
@@ -212,8 +220,8 @@ export const MOTIONS: Record<string, Motion> = {
       { t: 0, pose: P({ crouch: 8, lean: 0.2, armF: [1.2, 0.4], armB: [1.1, 0.45] }), ease: 'decel' },
       { t: 18, pose: P({ crouch: -4, lean: -0.12, armF: [-2.5, 1.05], armB: [-2.4, 1.0] }), ease: 'accel' },
       { t: 40, pose: P({ crouch: 0, lean: -0.06, headTilt: -0.18, armF: [-1.6, 0.95], armB: [-1.5, 0.9] }), ease: 'decel' },
-      { t: 64, pose: P({ crouch: 4, lean: 0, headTilt: -0.22, armF: [0.7, 0.85], armB: [0.6, 0.8], legF: [0.14, -0.1] }), ease: 'decel' },
-      { t: 100, pose: P({ crouch: 4, lean: 0, headTilt: -0.22, armF: [0.7, 0.85], armB: [0.6, 0.8], legF: [0.14, -0.1] }) },
+      { t: 64, pose: P({ crouch: 4, lean: 0, headTilt: -0.22, armF: [0.7, 0.85], armB: [0.6, 0.8], legF: [0.24, 0.1] }), ease: 'decel' },
+      { t: 100, pose: P({ crouch: 4, lean: 0, headTilt: -0.22, armF: [0.7, 0.85], armB: [0.6, 0.8], legF: [0.24, 0.1] }) },
     ],
   },
   // 雷翼裂空：翅膀猛地一扇把自己拔起来，再整个人砸下去
@@ -222,8 +230,8 @@ export const MOTIONS: Record<string, Motion> = {
     keys: [
       { t: 0, pose: P({ crouch: 4, lean: 0.02, armF: [0.7, 0.8], armB: [0.6, 0.75] }) },
       { t: 7, pose: P({ crouch: 20, lean: -0.3, armF: [-1.7, 1.0], armB: [-1.6, 0.95] }) },
-      { t: 12, pose: P({ crouch: -6, lean: -0.2, armF: [-2.6, 1.1], armB: [-2.5, 1.05], legF: [0.3, -0.9] }) },
-      { t: 20, pose: P({ crouch: 24, lean: 0.5, armF: [0.8, 0.12], armB: [0.75, 0.16], legF: [0.5, -0.12] }) },
+      { t: 12, pose: P({ crouch: -6, lean: -0.2, armF: [-2.6, 1.1], armB: [-2.5, 1.05], legF: [1.2, 0.9] }) },
+      { t: 20, pose: P({ crouch: 24, lean: 0.5, armF: [0.8, 0.12], armB: [0.75, 0.16], legF: [0.62, 0.12] }) },
       { t: 40, pose: P({ crouch: 6, lean: 0.06, armF: [0.7, 0.8], armB: [0.6, 0.75] }) },
     ],
   },
@@ -233,11 +241,11 @@ export const MOTIONS: Record<string, Motion> = {
     keys: [
       { t: 0, pose: P({ crouch: 6, lean: 0.02, armF: [0.7, 0.8], armB: [0.6, 0.75] }) },
       { t: 7, pose: P({ crouch: 20, lean: -0.32, armF: [-1.8, 1.0], armB: [-1.7, 0.95] }) },
-      { t: 12, pose: P({ crouch: -4, lean: -0.24, armF: [-2.5, 1.08], armB: [-2.4, 1.02], legF: [0.35, -1.0] }) },
-      { t: 17, pose: P({ crouch: -8, lean: -0.34, armF: [-2.7, 1.12], armB: [-2.6, 1.06], legF: [0.5, -1.3] }) },
-      { t: 22, pose: P({ crouch: -10, lean: -0.4, armF: [-2.8, 1.15], armB: [-2.7, 1.1], legF: [0.7, -1.5] }) },
-      { t: 27, pose: P({ lean: 0.3, armF: [1.4, 0.15], armB: [1.3, 0.2], legF: [0.6, -0.7] }) },
-      { t: 32, pose: P({ crouch: 30, lean: 0.58, armF: [0.7, 0.08], armB: [0.68, 0.12], legF: [0.5, -0.1] }) },
+      { t: 12, pose: P({ crouch: -4, lean: -0.24, armF: [-2.5, 1.08], armB: [-2.4, 1.02], legF: [1.35, 1] }) },
+      { t: 17, pose: P({ crouch: -8, lean: -0.34, armF: [-2.7, 1.12], armB: [-2.6, 1.06], legF: [1.8, 1.3] }) },
+      { t: 22, pose: P({ crouch: -10, lean: -0.4, armF: [-2.8, 1.15], armB: [-2.7, 1.1], legF: [2.2, 1.5] }) },
+      { t: 27, pose: P({ lean: 0.3, armF: [1.4, 0.15], armB: [1.3, 0.2], legF: [1.3, 0.7] }) },
+      { t: 32, pose: P({ crouch: 30, lean: 0.58, armF: [0.7, 0.08], armB: [0.68, 0.12], legF: [0.6, 0.1] }) },
       { t: 42, pose: P({ crouch: 12, lean: 0.2, armF: [0.8, 0.5], armB: [0.7, 0.5] }) },
       { t: 52, pose: P({ crouch: 6, lean: 0.02, armF: [0.7, 0.8], armB: [0.6, 0.75] }) },
     ],
@@ -249,8 +257,8 @@ export const MOTIONS: Record<string, Motion> = {
       { t: 0, pose: P({ crouch: 10, lean: 0.24, armF: [1.6, 0.3], armB: [-1.2, 0.3] }), ease: 'decel' },
       { t: 16, pose: P({ crouch: 6, lean: 0.12, armF: [2.3, 0.16], armB: [-0.9, 0.35] }), ease: 'snap' },
       { t: 34, pose: P({ crouch: 8, lean: 0.06, headTilt: -0.14, armF: [1.2, 0.6], armB: [-0.7, 0.4] }), ease: 'decel' },
-      { t: 58, pose: P({ crouch: 6, lean: 0.08, headTilt: -0.18, armF: [0.85, 0.5], armB: [-0.9, 0.38], legF: [0.16, -0.1] }), ease: 'decel' },
-      { t: 100, pose: P({ crouch: 6, lean: 0.08, headTilt: -0.18, armF: [0.85, 0.5], armB: [-0.9, 0.38], legF: [0.16, -0.1] }) },
+      { t: 58, pose: P({ crouch: 6, lean: 0.08, headTilt: -0.18, armF: [0.85, 0.5], armB: [-0.9, 0.38], legF: [0.26, 0.1] }), ease: 'decel' },
+      { t: 100, pose: P({ crouch: 6, lean: 0.08, headTilt: -0.18, armF: [0.85, 0.5], armB: [-0.9, 0.38], legF: [0.26, 0.1] }) },
     ],
   },
   // 判官笔：笔尖在身前画一道，鬼卒从那道口子里出来
@@ -286,8 +294,8 @@ export const MOTIONS: Record<string, Motion> = {
       { t: 0, pose: P({ crouch: 14, lean: 0.28, armF: [1.5, 0.2], armB: [-0.4, 0.3] }), ease: 'decel' },
       { t: 14, pose: P({ crouch: 8, lean: 0.1, armF: [0.6, 0.4], armB: [-0.5, 0.34] }), ease: 'snap' },
       { t: 30, pose: P({ crouch: 12, lean: 0.06, armF: [0.2, 0.34], armB: [-0.25, 0.3] }), ease: 'decel' },
-      { t: 56, pose: P({ crouch: 10, lean: 0.06, armF: [0.5, 0.36], armB: [-0.45, 0.32], legF: [0.16, -0.1] }), ease: 'decel' },
-      { t: 100, pose: P({ crouch: 10, lean: 0.06, armF: [0.5, 0.36], armB: [-0.45, 0.32], legF: [0.16, -0.1] }) },
+      { t: 56, pose: P({ crouch: 10, lean: 0.06, armF: [0.5, 0.36], armB: [-0.45, 0.32], legF: [0.26, 0.1] }), ease: 'decel' },
+      { t: 100, pose: P({ crouch: 10, lean: 0.06, armF: [0.5, 0.36], armB: [-0.45, 0.32], legF: [0.26, 0.1] }) },
     ],
   },
   // 干戚起舞：盾一顶、斧一轮，整个人往前碾一步
@@ -323,8 +331,8 @@ export const MOTIONS: Record<string, Motion> = {
       { t: 0, pose: P({ crouch: 16, lean: 0.3, armF: [1.4, 0.3], armB: [1.2, 0.35] }), ease: 'decel' },
       { t: 18, pose: P({ crouch: 10, lean: -0.1, armF: [1.1, 1.3], armB: [-0.4, 0.5] }), ease: 'snap' },
       { t: 38, pose: P({ crouch: 16, lean: -0.16, headTilt: 0.14, armF: [1.05, 1.25], armB: [-0.5, 0.45] }), ease: 'decel' },
-      { t: 60, pose: P({ crouch: 12, lean: -0.1, headTilt: 0.1, armF: [1.1, 1.3], armB: [-0.45, 0.48], legF: [0.18, -0.12] }), ease: 'decel' },
-      { t: 100, pose: P({ crouch: 12, lean: -0.1, headTilt: 0.1, armF: [1.1, 1.3], armB: [-0.45, 0.48], legF: [0.18, -0.12] }) },
+      { t: 60, pose: P({ crouch: 12, lean: -0.1, headTilt: 0.1, armF: [1.1, 1.3], armB: [-0.45, 0.48], legF: [0.3, 0.12] }), ease: 'decel' },
+      { t: 100, pose: P({ crouch: 12, lean: -0.1, headTilt: 0.1, armF: [1.1, 1.3], armB: [-0.45, 0.48], legF: [0.3, 0.12] }) },
     ],
   },
   // 耙筑山门：钉耙抡到头顶再整个人压下去
@@ -359,8 +367,8 @@ export const MOTIONS: Record<string, Motion> = {
     keys: [
       { t: 0, pose: P({ crouch: 6, lean: 0.14, armF: [0.5, 0.9], armB: [0.25, 0.7] }), ease: 'decel' },
       { t: 22, pose: P({ crouch: 2, lean: 0.02, armF: [0.15, 0.5], armB: [-0.15, 0.35] }), ease: 'decel' },
-      { t: 46, pose: P({ crouch: -4, lean: -0.14, headTilt: -0.24, armF: [0.05, 0.28], armB: [-0.1, 0.22], legF: [0.08, -0.06], legB: [-0.08, 0.06] }), ease: 'decel' },
-      { t: 100, pose: P({ crouch: -4, lean: -0.14, headTilt: -0.24, armF: [0.05, 0.28], armB: [-0.1, 0.22], legF: [0.08, -0.06], legB: [-0.08, 0.06] }) },
+      { t: 46, pose: P({ crouch: -4, lean: -0.14, headTilt: -0.24, armF: [0.05, 0.28], armB: [-0.1, 0.22], legF: [0.14, 0.06], legB: [-0.08, 0.06] }), ease: 'decel' },
+      { t: 100, pose: P({ crouch: -4, lean: -0.14, headTilt: -0.24, armF: [0.05, 0.28], armB: [-0.1, 0.22], legF: [0.14, 0.06], legB: [-0.08, 0.06] }) },
     ],
   },
 
@@ -369,35 +377,62 @@ export const MOTIONS: Record<string, Motion> = {
     loop: false, frames: 100,
     keys: [
       { t: 0, pose: P({ crouch: 10, lean: 0.3, armF: [0.4, 0.8], armB: [0.3, 0.7] }), ease: 'decel' },
-      { t: 20, pose: P({ crouch: 16, lean: 0.5, armF: [0.1, 1.1], armB: [0.15, 1.0], legF: [0.5, -0.2], legB: [-0.45, 0.25] }), ease: 'accel' },
-      { t: 40, pose: P({ crouch: -6, lean: -0.34, headTilt: -0.3, squash: 1.06, armF: [1.55, 1.15], armB: [-1.4, 1.05], legF: [0.3, -0.2], legB: [-0.3, 0.2] }), ease: 'snap' },
-      { t: 66, pose: P({ crouch: -2, lean: -0.2, headTilt: -0.2, armF: [1.25, 1.0], armB: [-1.15, 0.92], legF: [0.24, -0.16], legB: [-0.24, 0.16] }), ease: 'decel' },
-      { t: 100, pose: P({ crouch: -2, lean: -0.2, headTilt: -0.2, armF: [1.25, 1.0], armB: [-1.15, 0.92], legF: [0.24, -0.16], legB: [-0.24, 0.16] }) },
+      { t: 20, pose: P({ crouch: 16, lean: 0.5, armF: [0.1, 1.1], armB: [0.15, 1.0], legF: [0.7, 0.2], legB: [-0.45, 0.25] }), ease: 'accel' },
+      { t: 40, pose: P({ crouch: -6, lean: -0.34, headTilt: -0.3, squash: 1.06, armF: [1.55, 1.15], armB: [-1.4, 1.05], legF: [0.5, 0.2], legB: [-0.3, 0.2] }), ease: 'snap' },
+      { t: 66, pose: P({ crouch: -2, lean: -0.2, headTilt: -0.2, armF: [1.25, 1.0], armB: [-1.15, 0.92], legF: [0.4, 0.16], legB: [-0.24, 0.16] }), ease: 'decel' },
+      { t: 100, pose: P({ crouch: -2, lean: -0.2, headTilt: -0.2, armF: [1.25, 1.0], armB: [-1.15, 0.92], legF: [0.4, 0.16], legB: [-0.24, 0.16] }) },
     ],
   },
 
   idle: {
+    // 呼吸那一沉：髋沉 3，腿就要跟着屈 3，否则脚会插进地里 3px（此前正是如此）。
+    // 这对角度是 IK 解的：脚仍在原来那个位置，膝盖多屈一点。
     loop: true, frames: 72,
     keys: [
       { t: 0, pose: P({}) },
-      { t: 36, pose: P({ crouch: 3, lean: 0.04, armF: [0.25, 0.5] }) },
+      { t: 36, pose: P({ crouch: 3, lean: 0.04, armF: [0.25, 0.5], legF: [0.547, 0.693], legB: [0.099, 0.617] }) },
       { t: 72, pose: P({}) },
     ],
   },
   walk: {
+    // 腿的角度是**用两连杆 IK 反推**出来的（design-preview/leg-ik.mjs）：
+    // 指定"脚该落在哪"，解出髋/膝角，膝盖因此必然朝前凸、必然是人的弯法。
+    // 髋沉 6 是必须的——腿长 64 而髋高 62，脚落地时横向最多只能偏 16，
+    // 不沉一点就迈不开步（此前走起来两脚离地 12~17px，读成滑步）。
     loop: true, frames: 36,
     keys: [
-      { t: 0, pose: P({ legF: [0.5, -0.3], legB: [-0.5, 0.5], armF: [-0.3, 0.3], armB: [0.3, 0.3] }) },
-      { t: 18, pose: P({ legF: [-0.5, 0.5], legB: [0.5, -0.3], armF: [0.3, 0.3], armB: [-0.3, 0.3] }) },
-      { t: 36, pose: P({ legF: [0.5, -0.3], legB: [-0.5, 0.5], armF: [-0.3, 0.3], armB: [0.3, 0.3] }) },
+      { t: 0, pose: P({ crouch: 6, legF: [0.716, 0.81], legB: [0.094, 0.81], armF: [-0.3, 0.3], armB: [0.3, 0.3] }) },
+      { t: 18, pose: P({ crouch: 6, legF: [0.094, 0.81], legB: [0.716, 0.81], armF: [0.3, 0.3], armB: [-0.3, 0.3] }) },
+      { t: 36, pose: P({ crouch: 6, legF: [0.716, 0.81], legB: [0.094, 0.81], armF: [-0.3, 0.3], armB: [0.3, 0.3] }) },
     ],
   },
   jump: {
-    loop: false, frames: 20,
+    /**
+     * 跳跃：40 帧，覆盖**整段滞空**。
+     *
+     * 滞空有多长是算得出来的：初速 jumpVel 14~18、重力 0.9（engine/types.ts 的 GRAVITY），
+     * 大跳上升约 19 帧、整段约 38 帧。此前这段动作只有 20 帧，于是**整个下降过程都冻在
+     * 最后一帧**——玩家看到的"跳起来那一下"其实是那一个姿势被钉在屏幕上的十几帧。
+     *
+     * 腿的角度同样出自两连杆 IK（design-preview/leg-ik.mjs）：脚落在哪 → 反推髋膝角。
+     * 此前三条关键帧的前后腿**膝盖都朝前折**（膝弯量是负的 = 反向膝）：
+     * 前腿伸直朝前像一记飞踢，后腿小腿往前甩、膝盖翘在身后，整个腿折成 Z。
+     *
+     * 之后又错了一版，在**最高点**那帧：前腿的大腿几乎水平（84.8°）、小腿往后折，
+     * 后腿的小腿更是**平着朝后甩出去**（-91.7°，脚跟在髋后面 40）。两条腿一前一后
+     * 摊在地面上——画面读出来是"一腿跪着、一腿往后蹬"，根本不像人在空中。
+     * 收腿该收在**身前**：前膝抬到髋的高度、小腿折回来收到髋下；后腿折起、脚跟翘到
+     * 屁股后面，脚尖离地。现在两脚都在空中（脚底离地 28 与 46），是收起来的姿势。
+     *
+     * 起跳那一帧也顺带改了：后脚原来往后蹬到 26（比站姿多退了 13），读成一个**弓步**
+     * 而不是蓄力；现在后脚留在站姿的位置（-12），只是屈膝下压。
+     */
+    loop: false, frames: 40,
     keys: [
-      { t: 0, pose: P({ crouch: 12, legF: [0.4, -0.8], legB: [-0.2, -0.6] }) },
-      { t: 8, pose: P({ legF: [0.9, -1.4], legB: [-0.6, -1.0], armF: [1.2, 0.4], armB: [-1.0, 0.4], lean: 0.15 }) },
-      { t: 20, pose: P({ legF: [0.5, -0.9], legB: [-0.3, -0.7] }) },
+      { t: 0, pose: P({ crouch: 14, legF: [0.932, 1.374], legB: [0.417, 1.363] }) },
+      { t: 10, pose: P({ legF: [0.783, 0.99], legB: [0.246, 1.182], armF: [0.6, 0.4], armB: [-0.5, 0.3] }) },
+      { t: 19, pose: P({ legF: [1.011, 2.022], legB: [0.121, 2.207], armF: [1.2, 0.4], armB: [-1.0, 0.4], lean: 0.15 }) },
+      { t: 38, pose: P({ legF: [0.722, 0.757], legB: [0.09, 0.98] }) },
     ],
   },
   hit: {
@@ -409,17 +444,21 @@ export const MOTIONS: Record<string, Motion> = {
     ],
   },
   block: {
+    // 两脚踩在地上：髋沉 6/8，脚就在地面（此前脚尖插进地里 7~9px）。
     loop: false, frames: 8,
     keys: [
-      { t: 0, pose: P({ armF: [0.9, 1.6], armB: [1.0, 1.8], lean: -0.08, crouch: 6 }) },
-      { t: 8, pose: P({ armF: [1.0, 1.7], armB: [1.1, 1.9], lean: -0.1, crouch: 8 }) },
+      { t: 0, pose: P({ armF: [0.9, 1.6], armB: [1.0, 1.8], lean: -0.08, crouch: 6, legF: [0.692, 0.893], legB: [0.202, 0.893] }) },
+      { t: 8, pose: P({ armF: [1.0, 1.7], armB: [1.1, 1.9], lean: -0.1, crouch: 8, legF: [0.766, 1.024], legB: [0.259, 1.024] }) },
     ],
   },
   crouch: { // 下蹲：深屈膝、重心下沉、双手收在身前
+    // 此前这一帧是**劈叉**：前腿朝前伸直、小腿继续朝前甩，后腿朝后伸直、小腿又往前甩——
+    // 两脚横向拉开 94~100px（腿长才 64），读成横叉而不是蹲。膝盖还都朝前折（反向膝）。
+    // 现在用 IK 从"脚落在哪"反推：膝盖朝前凸、脚踩在地面上、髋真的沉下去。
     loop: false, frames: 8,
     keys: [
-      { t: 0, pose: P({ crouch: 16, legF: [0.5, -0.9], legB: [-0.5, 0.9], armF: [0.7, 1.3], armB: [0.6, 1.2], lean: 0.05 }) },
-      { t: 8, pose: P({ crouch: 22, legF: [0.6, -1.0], legB: [-0.6, 1.0], armF: [0.8, 1.4], armB: [0.7, 1.3], lean: 0.06 }) },
+      { t: 0, pose: P({ crouch: 20, legF: [1.156, 1.584], legB: [0.485, 1.614], armF: [0.7, 1.3], armB: [0.6, 1.2], lean: 0.05 }) },
+      { t: 8, pose: P({ crouch: 26, legF: [1.31, 1.831], legB: [0.583, 1.859], armF: [0.8, 1.4], armB: [0.7, 1.3], lean: 0.06 }) },
     ],
   },
   sweep: { // 下段扫腿（n2）：沉腰、前腿贴地横扫。
@@ -428,17 +467,17 @@ export const MOTIONS: Record<string, Motion> = {
     // 前腿几乎压平（legF 第一节 1.3 接近水平），判定框也贴着地面。
     loop: false, frames: 15,
     keys: [
-      { t: 0, pose: P({ crouch: 8, lean: 0.1, armF: [0.3, 0.5], legF: [0.3, -0.3] }) },
-      { t: 4, pose: P({ crouch: 20, lean: 0.28, armF: [0.9, 0.9], armB: [-0.5, 0.6], legF: [1.3, -0.15], legB: [-0.5, 0.9] }), ease: 'snap' },
-      { t: 7, pose: P({ crouch: 22, lean: 0.3, armF: [1.0, 1.0], legF: [1.35, -0.1], legB: [-0.55, 0.95] }) },
-      { t: 15, pose: P({ crouch: 6, lean: 0.08, armF: [0.4, 0.5], legF: [0.25, -0.2] }), ease: 'decel' },
+      { t: 0, pose: P({ crouch: 8, lean: 0.1, armF: [0.3, 0.5], legF: [0.6, 0.3] }) },
+      { t: 4, pose: P({ crouch: 20, lean: 0.28, armF: [0.9, 0.9], armB: [-0.5, 0.6], legF: [1.45, 0.15], legB: [-0.5, 0.9] }), ease: 'snap' },
+      { t: 7, pose: P({ crouch: 22, lean: 0.3, armF: [1.0, 1.0], legF: [1.45, 0.1], legB: [-0.55, 0.95] }) },
+      { t: 15, pose: P({ crouch: 6, lean: 0.08, armF: [0.4, 0.5], legF: [0.45, 0.2] }), ease: 'decel' },
     ],
   },
   thrust: { // 直刺（n1/n2）：前手直线捅出
     loop: false, frames: 15,
     keys: [
       { t: 0, pose: P({ armF: [-0.4, 0.6], lean: 0.05 }) },
-      { t: 4, pose: P({ armF: [1.5, 0.05], lean: 0.3, legF: [0.35, -0.2], legB: [-0.4, 0.3] }) },
+      { t: 4, pose: P({ armF: [1.5, 0.05], lean: 0.3, legF: [0.55, 0.2], legB: [-0.4, 0.3] }) },
       { t: 7, pose: P({ armF: [1.55, 0], lean: 0.32 }) },
       { t: 15, pose: P({ armF: [0.3, 0.4], lean: 0.05 }) },
     ],
@@ -447,7 +486,7 @@ export const MOTIONS: Record<string, Motion> = {
     loop: false, frames: 21,
     keys: [
       { t: 0, pose: P({ crouch: 10, armF: [-0.8, 0.8], lean: 0.1 }) },
-      { t: 6, pose: P({ armF: [2.4, 0.1], lean: -0.15, crouch: 0, legF: [0.5, -0.5] }) },
+      { t: 6, pose: P({ armF: [2.4, 0.1], lean: -0.15, crouch: 0, legF: [1, 0.5] }) },
       { t: 12, pose: P({ armF: [2.6, 0], lean: -0.2 }) },
       { t: 21, pose: P({ armF: [0.4, 0.4] }) },
     ],
@@ -465,7 +504,7 @@ export const MOTIONS: Record<string, Motion> = {
     loop: false, frames: 26,
     keys: [
       { t: 0, pose: P({ lean: 0.1, crouch: 8, armF: [-0.6, 0.9], armB: [0.5, 0.6] }) },
-      { t: 8, pose: P({ lean: 0.55, crouch: 4, armF: [1.1, 0.2], armB: [-0.9, 0.8], legF: [0.8, -0.5], legB: [-0.7, 0.7] }) },
+      { t: 8, pose: P({ lean: 0.55, crouch: 4, armF: [1.1, 0.2], armB: [-0.9, 0.8], legF: [1.3, 0.5], legB: [-0.7, 0.7] }) },
       { t: 18, pose: P({ lean: 0.5, armF: [1.3, 0.1] }) },
       { t: 26, pose: P({ lean: 0.05 }) },
     ],
@@ -503,11 +542,11 @@ export const MOTIONS: Record<string, Motion> = {
     keys: [
       { t: 0, pose: P({ crouch: 10, lean: -0.15, armF: [1.6, 1.0], armB: [-1.6, 1.0] }) },
       { t: 8, pose: P({ crouch: 18, lean: -0.3, armF: [2.4, 0.7], armB: [-2.4, 0.7] }) }, // 深蓄
-      { t: 14, pose: P({ crouch: 6, lean: -0.1, armF: [0.4, 0.3], armB: [-0.4, 0.3], legF: [0.3, -0.2], legB: [-0.3, 0.3] }) }, // 拔起
-      { t: 16, pose: P({ crouch: 0, lean: 0.35, armF: [1.7, 0.1], armB: [-0.3, 0.4], legF: [0.5, -0.3], legB: [-0.4, 0.4] }) }, // 挥 1
-      { t: 19, pose: P({ lean: 0.3, armF: [0.2, 0.5], armB: [1.75, 0.05], legF: [0.5, -0.3], legB: [-0.4, 0.4] }) }, // 挥 2（换臂）
-      { t: 22, pose: P({ lean: 0.4, armF: [1.8, 0], armB: [0.3, 0.4], legF: [0.5, -0.3], legB: [-0.4, 0.4] }) }, // 挥 3
-      { t: 26, pose: P({ lean: 0.48, armF: [1.6, -0.1], armB: [1.6, -0.1], legF: [0.5, -0.3], legB: [-0.4, 0.4] }) }, // 命中：六臂齐出
+      { t: 14, pose: P({ crouch: 6, lean: -0.1, armF: [0.4, 0.3], armB: [-0.4, 0.3], legF: [0.5, 0.2], legB: [-0.3, 0.3] }) }, // 拔起
+      { t: 16, pose: P({ crouch: 0, lean: 0.35, armF: [1.7, 0.1], armB: [-0.3, 0.4], legF: [0.8, 0.3], legB: [-0.4, 0.4] }) }, // 挥 1
+      { t: 19, pose: P({ lean: 0.3, armF: [0.2, 0.5], armB: [1.75, 0.05], legF: [0.8, 0.3], legB: [-0.4, 0.4] }) }, // 挥 2（换臂）
+      { t: 22, pose: P({ lean: 0.4, armF: [1.8, 0], armB: [0.3, 0.4], legF: [0.8, 0.3], legB: [-0.4, 0.4] }) }, // 挥 3
+      { t: 26, pose: P({ lean: 0.48, armF: [1.6, -0.1], armB: [1.6, -0.1], legF: [0.8, 0.3], legB: [-0.4, 0.4] }) }, // 命中：六臂齐出
       { t: 34, pose: P({ crouch: 4, lean: 0.2, armF: [0.7, 0.4], armB: [-0.3, 0.3] }) },
       { t: 50, pose: P({ armF: [0.3, 0.4], armB: [-0.2, 0.3], lean: 0.05 }) },
     ],
@@ -517,13 +556,13 @@ export const MOTIONS: Record<string, Motion> = {
   wukongSp100: { // startup16 active10[16,26) recovery→52
     loop: false, frames: 52,
     keys: [
-      { t: 0, pose: P({ crouch: 8, lean: -0.1, armF: [0.6, 0.5], armB: [-0.5, 0.5], legF: [0.3, -0.5], legB: [-0.2, -0.4] }) },
-      { t: 8, pose: P({ crouch: 20, lean: -0.25, armF: [-0.3, 0.6], armB: [0.4, 0.6], legF: [0.6, -1.0], legB: [-0.5, -0.8] }) }, // 深蹲蓄势
-      { t: 14, pose: P({ crouch: 0, lean: -0.4, armF: [-0.9, 0.3], armB: [-0.7, 0.3], legF: [0.8, -1.3], legB: [-0.7, -1.1] }) }, // 起跳
-      { t: 16, pose: P({ lean: -0.3, armF: [2.6, 0.3], armB: [2.5, 0.3], legF: [0.9, -1.4], legB: [-0.6, -1.0] }) }, // 棍抡过顶
-      { t: 20, pose: P({ lean: 0.1, armF: [3.05, 0.05], armB: [3.0, 0.05], legF: [0.7, -1.2], legB: [-0.5, -0.9] }) }, // 顶点
-      { t: 24, pose: P({ lean: 0.4, armF: [1.6, 0.05], armB: [1.55, 0.05], legF: [0.5, -0.6], legB: [-0.3, -0.3] }) }, // 下劈
-      { t: 28, pose: P({ crouch: 14, lean: 0.5, armF: [0.85, 0.1], armB: [0.85, 0.1], legF: [0.5, -0.15], legB: [-0.4, 0.15] }) }, // 落地砸
+      { t: 0, pose: P({ crouch: 8, lean: -0.1, armF: [0.6, 0.5], armB: [-0.5, 0.5], legF: [0.8, 0.5], legB: [0.2, 0.4] }) },
+      { t: 8, pose: P({ crouch: 20, lean: -0.25, armF: [-0.3, 0.6], armB: [0.4, 0.6], legF: [1.6, 1], legB: [0.3, 0.8] }) }, // 深蹲蓄势
+      { t: 14, pose: P({ crouch: 0, lean: -0.4, armF: [-0.9, 0.3], armB: [-0.7, 0.3], legF: [2.1, 1.3], legB: [0.4, 1.1] }) }, // 起跳
+      { t: 16, pose: P({ lean: -0.3, armF: [2.6, 0.3], armB: [2.5, 0.3], legF: [2.3, 1.4], legB: [0.4, 1] }) }, // 棍抡过顶
+      { t: 20, pose: P({ lean: 0.1, armF: [3.05, 0.05], armB: [3.0, 0.05], legF: [1.9, 1.2], legB: [0.4, 0.9] }) }, // 顶点
+      { t: 24, pose: P({ lean: 0.4, armF: [1.6, 0.05], armB: [1.55, 0.05], legF: [1.1, 0.6], legB: [0, 0.3] }) }, // 下劈
+      { t: 28, pose: P({ crouch: 14, lean: 0.5, armF: [0.85, 0.1], armB: [0.85, 0.1], legF: [0.65, 0.15], legB: [-0.4, 0.15] }) }, // 落地砸
       { t: 38, pose: P({ crouch: 6, lean: 0.2, armF: [0.5, 0.3], armB: [-0.2, 0.3] }) },
       { t: 52, pose: P({ armF: [0.3, 0.4], armB: [-0.2, 0.3], lean: 0.05 }) },
     ],
@@ -550,11 +589,11 @@ export const MOTIONS: Record<string, Motion> = {
     loop: false, frames: 60,
     keys: [
       { t: 0, pose: P({ crouch: 6, lean: 0.05 }) },
-      { t: 10, pose: P({ crouch: 20, lean: -0.3, armF: [1.0, 0.7], armB: [-0.8, 0.7], legF: [0.4, -0.7], legB: [-0.4, 0.5] }) }, // 缓慢压低
-      { t: 18, pose: P({ crouch: 26, lean: -0.5, armF: [1.3, 0.75], armB: [-1.1, 0.75], legF: [0.7, -1.0], legB: [-0.6, 0.8] }) }, // 低头顶角蓄满
-      { t: 22, pose: P({ crouch: 6, lean: 0.55, armF: [0.2, 0.3], armB: [0.2, 0.3], legF: [0.9, -0.3], legB: [-0.8, 0.5] }) }, // 骤然前冲
-      { t: 26, pose: P({ crouch: 2, lean: 0.6, armF: [0.1, 0.2], armB: [0.1, 0.2], legF: [1.0, -0.2], legB: [-0.9, 0.4] }) }, // 命中顶点
-      { t: 30, pose: P({ crouch: 4, lean: 0.5, armF: [0.4, 0.3], armB: [0.3, 0.3], legF: [0.7, -0.2], legB: [-0.6, 0.5] }) },
+      { t: 10, pose: P({ crouch: 20, lean: -0.3, armF: [1.0, 0.7], armB: [-0.8, 0.7], legF: [1.1, 0.7], legB: [-0.4, 0.5] }) }, // 缓慢压低
+      { t: 18, pose: P({ crouch: 26, lean: -0.5, armF: [1.3, 0.75], armB: [-1.1, 0.75], legF: [1.7, 1], legB: [-0.6, 0.8] }) }, // 低头顶角蓄满
+      { t: 22, pose: P({ crouch: 6, lean: 0.55, armF: [0.2, 0.3], armB: [0.2, 0.3], legF: [1.2, 0.3], legB: [-0.8, 0.5] }) }, // 骤然前冲
+      { t: 26, pose: P({ crouch: 2, lean: 0.6, armF: [0.1, 0.2], armB: [0.1, 0.2], legF: [1.2, 0.2], legB: [-0.9, 0.4] }) }, // 命中顶点
+      { t: 30, pose: P({ crouch: 4, lean: 0.5, armF: [0.4, 0.3], armB: [0.3, 0.3], legF: [0.9, 0.2], legB: [-0.6, 0.5] }) },
       { t: 44, pose: P({ crouch: 8, lean: 0.25, armF: [0.5, 0.4], armB: [-0.1, 0.35] }) }, // 惯性踉跄
       { t: 60, pose: P({ armF: [0.3, 0.4], armB: [-0.2, 0.3], lean: 0.05 }) },
     ],
@@ -616,41 +655,41 @@ export const MOTIONS: Record<string, Motion> = {
   nezhaFlurry: {
     loop: false, frames: 24,
     keys: [
-      { t: 0, pose: P({ lean: 0.3, armF: [1.6, 0.1], armB: [-0.3, 0.4], legF: [0.4, -0.2], legB: [-0.3, 0.3] }) }, // 挥 1（承接突进）
-      { t: 6, pose: P({ lean: 0.28, armF: [0.2, 0.5], armB: [1.7, 0.05], legF: [0.4, -0.2], legB: [-0.3, 0.3] }) }, // 挥 2 换臂
-      { t: 12, pose: P({ lean: 0.35, armF: [1.75, 0], armB: [0.3, 0.4], legF: [0.45, -0.25], legB: [-0.35, 0.35] }) }, // 挥 3
-      { t: 18, pose: P({ lean: 0.3, armF: [0.25, 0.5], armB: [1.7, 0], legF: [0.45, -0.25], legB: [-0.35, 0.35] }) }, // 挥 4 换臂
-      { t: 24, pose: P({ lean: 0.4, armF: [1.6, -0.1], armB: [1.6, -0.1], legF: [0.5, -0.3], legB: [-0.4, 0.4] }) }, // 收：双臂齐出，过渡到挑空
+      { t: 0, pose: P({ lean: 0.3, armF: [1.6, 0.1], armB: [-0.3, 0.4], legF: [0.6, 0.2], legB: [-0.3, 0.3] }) }, // 挥 1（承接突进）
+      { t: 6, pose: P({ lean: 0.28, armF: [0.2, 0.5], armB: [1.7, 0.05], legF: [0.6, 0.2], legB: [-0.3, 0.3] }) }, // 挥 2 换臂
+      { t: 12, pose: P({ lean: 0.35, armF: [1.75, 0], armB: [0.3, 0.4], legF: [0.7, 0.25], legB: [-0.35, 0.35] }) }, // 挥 3
+      { t: 18, pose: P({ lean: 0.3, armF: [0.25, 0.5], armB: [1.7, 0], legF: [0.7, 0.25], legB: [-0.35, 0.35] }) }, // 挥 4 换臂
+      { t: 24, pose: P({ lean: 0.4, armF: [1.6, -0.1], armB: [1.6, -0.1], legF: [0.8, 0.3], legB: [-0.4, 0.4] }) }, // 收：双臂齐出，过渡到挑空
     ],
   },
   // 哪吒·六臂爆发：终结姿态，双臂大幅展开到近乎水平，读出"六臂齐张"的爆发瞬间
   nezhaSixArm: {
     loop: false, frames: 16,
     keys: [
-      { t: 0, pose: P({ lean: 0.15, crouch: 2, armF: [1.4, 0.2], armB: [-1.4, 0.2], legF: [0.3, -0.2], legB: [-0.3, 0.3] }) }, // 承接挑空落势
-      { t: 5, pose: P({ lean: 0.05, crouch: 0, armF: [2.2, 0.5], armB: [-2.2, 0.5], legF: [0.4, -0.2], legB: [-0.4, 0.3] }) }, // 六臂展开
-      { t: 9, pose: P({ lean: 0, armF: [2.6, 0.7], armB: [-2.6, 0.7], legF: [0.45, -0.25], legB: [-0.45, 0.35] }) }, // 极张，爆发点
-      { t: 16, pose: P({ lean: 0.2, crouch: 3, armF: [0.8, 0.4], armB: [-0.6, 0.4], legF: [0.3, -0.15], legB: [-0.25, 0.25] }) }, // 归位
+      { t: 0, pose: P({ lean: 0.15, crouch: 2, armF: [1.4, 0.2], armB: [-1.4, 0.2], legF: [0.5, 0.2], legB: [-0.3, 0.3] }) }, // 承接挑空落势
+      { t: 5, pose: P({ lean: 0.05, crouch: 0, armF: [2.2, 0.5], armB: [-2.2, 0.5], legF: [0.6, 0.2], legB: [-0.4, 0.3] }) }, // 六臂展开
+      { t: 9, pose: P({ lean: 0, armF: [2.6, 0.7], armB: [-2.6, 0.7], legF: [0.7, 0.25], legB: [-0.45, 0.35] }) }, // 极张，爆发点
+      { t: 16, pose: P({ lean: 0.2, crouch: 3, armF: [0.8, 0.4], armB: [-0.6, 0.4], legF: [0.45, 0.15], legB: [-0.25, 0.25] }) }, // 归位
     ],
   },
   // 孙悟空·空中横扫：承接跃起的滞空腿型不变，棍从身后横扫到身前另一侧
   wukongAerialSweep: {
     loop: false, frames: 24,
     keys: [
-      { t: 0, pose: P({ lean: -0.2, armF: [2.6, 0.2], armB: [-1.6, 0.3], legF: [0.8, -1.3], legB: [-0.6, -1.0] }) }, // 承接跃起，棍横置身后
-      { t: 8, pose: P({ lean: 0.05, armF: [0.6, 0.1], armB: [-2.5, 0.3], legF: [0.85, -1.35], legB: [-0.55, -1.0] }) }, // 横扫过中线
-      { t: 16, pose: P({ lean: 0.3, armF: [-1.5, 0.1], armB: [1.6, 0.2], legF: [0.75, -1.25], legB: [-0.5, -0.9] }) }, // 扫至另一侧
-      { t: 24, pose: P({ lean: 0.4, armF: [-0.2, 0.3], armB: [2.8, 0.1], legF: [0.6, -1.0], legB: [-0.4, -0.7] }) }, // 收势下沉，过渡到落地
+      { t: 0, pose: P({ lean: -0.2, armF: [2.6, 0.2], armB: [-1.6, 0.3], legF: [2.1, 1.3], legB: [0.4, 1] }) }, // 承接跃起，棍横置身后
+      { t: 8, pose: P({ lean: 0.05, armF: [0.6, 0.1], armB: [-2.5, 0.3], legF: [2.2, 1.35], legB: [0.45, 1] }) }, // 横扫过中线
+      { t: 16, pose: P({ lean: 0.3, armF: [-1.5, 0.1], armB: [1.6, 0.2], legF: [2, 1.25], legB: [0.4, 0.9] }) }, // 扫至另一侧
+      { t: 24, pose: P({ lean: 0.4, armF: [-0.2, 0.3], armB: [2.8, 0.1], legF: [1.6, 1], legB: [0.3, 0.7] }) }, // 收势下沉，过渡到落地
     ],
   },
   // 孙悟空·棍旋收势：承接落地砸的低伏，棍从一侧扬起旋过头顶收到另一侧，最后收棍站定
   wukongStaffSpin: {
     loop: false, frames: 18,
     keys: [
-      { t: 0, pose: P({ crouch: 10, lean: 0.35, armF: [0.7, 0.2], armB: [0.7, 0.2], legF: [0.5, -0.15], legB: [-0.4, 0.15] }) }, // 承接落地砸
-      { t: 6, pose: P({ crouch: 4, lean: 0.1, armF: [2.2, 0.3], armB: [-1.2, 0.4], legF: [0.4, -0.1], legB: [-0.3, 0.2] }) }, // 棍上扬旋起
-      { t: 12, pose: P({ crouch: 0, lean: -0.1, armF: [-0.8, 0.3], armB: [1.5, 0.2], legF: [0.3, -0.05], legB: [-0.2, 0.15] }) }, // 旋至另一侧
-      { t: 18, pose: P({ crouch: 2, lean: 0.05, armF: [0.35, 0.4], armB: [-0.2, 0.3], legF: [0.2, -0.1], legB: [-0.15, 0.1] }) }, // 收棍归位
+      { t: 0, pose: P({ crouch: 10, lean: 0.35, armF: [0.7, 0.2], armB: [0.7, 0.2], legF: [0.65, 0.15], legB: [-0.4, 0.15] }) }, // 承接落地砸
+      { t: 6, pose: P({ crouch: 4, lean: 0.1, armF: [2.2, 0.3], armB: [-1.2, 0.4], legF: [0.5, 0.1], legB: [-0.3, 0.2] }) }, // 棍上扬旋起
+      { t: 12, pose: P({ crouch: 0, lean: -0.1, armF: [-0.8, 0.3], armB: [1.5, 0.2], legF: [0.35, 0.05], legB: [-0.2, 0.15] }) }, // 旋至另一侧
+      { t: 18, pose: P({ crouch: 2, lean: 0.05, armF: [0.35, 0.4], armB: [-0.2, 0.3], legF: [0.3, 0.1], legB: [-0.15, 0.1] }) }, // 收棍归位
     ],
   },
   // 二郎神·结印：双手抬至额前定身聚力（照搬旧 erlangSp100 的开局段，拆成独立动作单独复用）
@@ -685,19 +724,19 @@ export const MOTIONS: Record<string, Motion> = {
   niumoGore: {
     loop: false, frames: 10,
     keys: [
-      { t: 0, pose: P({ crouch: 16, lean: 0.7, armF: [0.2, 0.2], armB: [0.2, 0.2], legF: [0.9, -0.4], legB: [-0.8, 0.5] }) }, // 蓄到最低，角尖贴地
-      { t: 3, pose: P({ crouch: 2, lean: -0.42, armF: [1.5, 1.1], armB: [-1.3, 1.0], legF: [0.5, -0.9], legB: [-0.5, 0.2] }) }, // 上身甩起，双臂外张，把人挑上天
-      { t: 10, pose: P({ crouch: 0, lean: -0.22, armF: [1.1, 0.9], armB: [-0.9, 0.8], legF: [0.3, -0.4], legB: [-0.3, 0.2] }) }, // 挑势顶点滞留
+      { t: 0, pose: P({ crouch: 16, lean: 0.7, armF: [0.2, 0.2], armB: [0.2, 0.2], legF: [1.3, 0.4], legB: [-0.8, 0.5] }) }, // 蓄到最低，角尖贴地
+      { t: 3, pose: P({ crouch: 2, lean: -0.42, armF: [1.5, 1.1], armB: [-1.3, 1.0], legF: [1.4, 0.9], legB: [-0.5, 0.2] }) }, // 上身甩起，双臂外张，把人挑上天
+      { t: 10, pose: P({ crouch: 0, lean: -0.22, armF: [1.1, 0.9], armB: [-0.9, 0.8], legF: [0.7, 0.4], legB: [-0.3, 0.2] }) }, // 挑势顶点滞留
     ],
   },
   // 牛魔王·落地震：从顶角的仰身高位整个砸回地面，再缓缓站定
   niumoLandShock: {
     loop: false, frames: 20,
     keys: [
-      { t: 0, pose: P({ crouch: 0, lean: -0.2, armF: [1.0, 0.9], armB: [-0.8, 0.8], legF: [0.3, -0.4], legB: [-0.3, 0.2] }) }, // 承接顶角高位
-      { t: 5, pose: P({ crouch: 20, lean: 0.3, armF: [0.5, 1.0], armB: [0.4, 1.0], legF: [0.8, -0.1], legB: [-0.8, 0.3] }) }, // 双拳砸地，震波起
-      { t: 11, pose: P({ crouch: 12, lean: 0.15, armF: [0.6, 0.5], armB: [-0.2, 0.4], legF: [0.5, -0.15], legB: [-0.5, 0.35] }) }, // 反弹
-      { t: 20, pose: P({ crouch: 6, lean: 0.05, armF: [0.3, 0.4], armB: [-0.2, 0.3], legF: [0.3, -0.1], legB: [-0.3, 0.2] }) }, // 站定
+      { t: 0, pose: P({ crouch: 0, lean: -0.2, armF: [1.0, 0.9], armB: [-0.8, 0.8], legF: [0.7, 0.4], legB: [-0.3, 0.2] }) }, // 承接顶角高位
+      { t: 5, pose: P({ crouch: 20, lean: 0.3, armF: [0.5, 1.0], armB: [0.4, 1.0], legF: [0.9, 0.1], legB: [-0.8, 0.3] }) }, // 双拳砸地，震波起
+      { t: 11, pose: P({ crouch: 12, lean: 0.15, armF: [0.6, 0.5], armB: [-0.2, 0.4], legF: [0.65, 0.15], legB: [-0.5, 0.35] }) }, // 反弹
+      { t: 20, pose: P({ crouch: 6, lean: 0.05, armF: [0.3, 0.4], armB: [-0.2, 0.3], legF: [0.4, 0.1], legB: [-0.3, 0.2] }) }, // 站定
     ],
   }
 };
@@ -733,40 +772,41 @@ for (const [id, v, hp, speed] of [
 Object.assign(MOTIONS, {
   // 跑：比走幅度大得多的大步流星，身体明显前倾
   run: {
+    // 跑：前腿向前甩、后腿蹬直。此前两脚横向拉开 113px（腿长 64）——那不是跑，是劈叉。
     loop: true, frames: 24,
     keys: [
-      { t: 0, pose: P({ lean: 0.34, crouch: 4, legF: [0.95, -0.7], legB: [-0.8, 0.85], armF: [-0.6, 0.7], armB: [0.75, 0.6] }) },
-      { t: 12, pose: P({ lean: 0.38, crouch: 2, legF: [-0.8, 0.9], legB: [0.95, -0.65], armF: [0.75, 0.6], armB: [-0.6, 0.7] }) },
-      { t: 24, pose: P({ lean: 0.34, crouch: 4, legF: [0.95, -0.7], legB: [-0.8, 0.85], armF: [-0.6, 0.7], armB: [0.75, 0.6] }) },
+      { t: 0, pose: P({ lean: 0.34, crouch: 2, legF: [1.186, 1.176], legB: [-0.196, 0.393], armF: [-0.6, 0.7], armB: [0.75, 0.6] }) },
+      { t: 12, pose: P({ lean: 0.38, crouch: 2, legF: [-0.196, 0.393], legB: [1.186, 1.176], armF: [0.75, 0.6], armB: [-0.6, 0.7] }) },
+      { t: 24, pose: P({ lean: 0.34, crouch: 2, legF: [1.186, 1.176], legB: [-0.196, 0.393], armF: [-0.6, 0.7], armB: [0.75, 0.6] }) },
     ],
   },
   // 后跳：团身向后飘
   backstep: {
     loop: false, frames: 24,
     keys: [
-      { t: 0, pose: P({ lean: -0.35, crouch: 12, legF: [0.7, -1.0], legB: [-0.5, -0.7], armF: [-0.5, 0.9], armB: [-0.35, 0.8] }), ease: 'snap' as const },
-      { t: 10, pose: P({ lean: -0.5, crouch: 0, roll: -0.22, legF: [0.95, -1.35], legB: [-0.7, -1.0], armF: [-0.9, 1.1], armB: [-0.7, 1.0] }), ease: 'decel' as const },
-      { t: 24, pose: P({ lean: -0.2, crouch: 8, legF: [0.5, -0.8], legB: [-0.35, -0.5], armF: [-0.3, 0.7], armB: [-0.2, 0.6] }) },
+      { t: 0, pose: P({ lean: -0.35, crouch: 12, legF: [1.7, 1], legB: [0.2, 0.7], armF: [-0.5, 0.9], armB: [-0.35, 0.8] }), ease: 'snap' as const },
+      { t: 10, pose: P({ lean: -0.5, crouch: 0, roll: -0.22, legF: [2.3, 1.35], legB: [0.3, 1], armF: [-0.9, 1.1], armB: [-0.7, 1.0] }), ease: 'decel' as const },
+      { t: 24, pose: P({ lean: -0.2, crouch: 8, legF: [1.3, 0.8], legB: [0.15, 0.5], armF: [-0.3, 0.7], armB: [-0.2, 0.6] }) },
     ],
   },
   // 紧急回避：整个人低伏着滚过去，roll 轴转一整圈
   roll: {
     loop: false, frames: 30,
     keys: [
-      { t: 0, pose: P({ lean: 0.5, crouch: 18, legF: [0.9, -0.9], legB: [-0.7, 0.6], armF: [0.6, 1.2], armB: [0.5, 1.1] }), ease: 'accel' as const },
-      { t: 8, pose: P({ lean: 0.6, crouch: 30, roll: -2.1, squash: 0.9, legF: [1.2, -1.4], legB: [-1.0, -0.6], armF: [1.0, 1.5], armB: [0.9, 1.4] }) },
-      { t: 18, pose: P({ lean: 0.6, crouch: 30, roll: -5.0, squash: 0.92, legF: [1.1, -1.3], legB: [-0.9, -0.5], armF: [0.9, 1.45], armB: [0.8, 1.35] }), ease: 'decel' as const },
-      { t: 30, pose: P({ lean: 0.2, crouch: 10, roll: -6.283, legF: [0.5, -0.5], legB: [-0.4, 0.3], armF: [0.4, 0.8], armB: [0.3, 0.7] }) },
+      { t: 0, pose: P({ lean: 0.5, crouch: 18, legF: [1.8, 0.9], legB: [-0.7, 0.6], armF: [0.6, 1.2], armB: [0.5, 1.1] }), ease: 'accel' as const },
+      { t: 8, pose: P({ lean: 0.6, crouch: 30, roll: -2.1, squash: 0.9, legF: [2.6, 1.4], legB: [-0.4, 0.6], armF: [1.0, 1.5], armB: [0.9, 1.4] }) },
+      { t: 18, pose: P({ lean: 0.6, crouch: 30, roll: -5.0, squash: 0.92, legF: [2.4, 1.3], legB: [-0.4, 0.5], armF: [0.9, 1.45], armB: [0.8, 1.35] }), ease: 'decel' as const },
+      { t: 30, pose: P({ lean: 0.2, crouch: 10, roll: -6.283, legF: [1, 0.5], legB: [-0.4, 0.3], armF: [0.4, 0.8], armB: [0.3, 0.7] }) },
     ],
   },
   // 跳跃普攻：身体在空中团起来、武器向斜下方压出去，落地即收
   airStrike: {
     loop: false, frames: 27,
     keys: [
-      { t: 0, pose: P({ lean: -0.2, crouch: 0, armF: [-0.7, 0.9], armB: [-0.5, 0.7], legF: [0.7, -1.1], legB: [-0.5, -0.8] }), ease: 'accel' as const },
-      { t: 6, pose: P({ lean: 0.5, crouch: 0, squash: 1.06, armF: [1.15, 0.12], armB: [-0.8, 0.6], legF: [0.5, -0.8], legB: [-0.35, -0.5] }), ease: 'snap' as const },
-      { t: 18, pose: P({ lean: 0.56, crouch: 0, armF: [1.28, 0.06], armB: [-0.7, 0.55], legF: [0.35, -0.6], legB: [-0.25, -0.35] }), ease: 'decel' as const },
-      { t: 27, pose: P({ lean: 0.3, crouch: 0, armF: [0.7, 0.4], armB: [-0.4, 0.4], legF: [0.4, -0.7], legB: [-0.3, -0.45] }) },
+      { t: 0, pose: P({ lean: -0.2, crouch: 0, armF: [-0.7, 0.9], armB: [-0.5, 0.7], legF: [1.8, 1.1], legB: [0.3, 0.8] }), ease: 'accel' as const },
+      { t: 6, pose: P({ lean: 0.5, crouch: 0, squash: 1.06, armF: [1.15, 0.12], armB: [-0.8, 0.6], legF: [1.3, 0.8], legB: [0.15, 0.5] }), ease: 'snap' as const },
+      { t: 18, pose: P({ lean: 0.56, crouch: 0, armF: [1.28, 0.06], armB: [-0.7, 0.55], legF: [0.95, 0.6], legB: [0.1, 0.35] }), ease: 'decel' as const },
+      { t: 27, pose: P({ lean: 0.3, crouch: 0, armF: [0.7, 0.4], armB: [-0.4, 0.4], legF: [1.1, 0.7], legB: [0.15, 0.45] }) },
     ],
   },
   // 另一侧的挨打反应：与 hit 按 hitCount 奇偶交替，连打读成被打得左右摇晃。
@@ -774,8 +814,8 @@ Object.assign(MOTIONS, {
   hitAlt: {
     loop: false, frames: 14,
     keys: [
-      { t: 0, pose: P({ lean: -0.3, crouch: 10, squash: 0.88, roll: -0.12, headTilt: 0.2, armF: [0.4, 1.4], armB: [1.1, 1.2], legF: [0.5, -0.4], legB: [-0.3, 0.2] }), ease: 'snap' as const },
-      { t: 6, pose: P({ lean: -0.42, crouch: 4, squash: 1.05, roll: -0.18, headTilt: 0.28, armF: [1.2, 1.0], armB: [0.3, 1.3], legF: [0.2, -0.2], legB: [-0.5, 0.4] }), ease: 'decel' as const },
+      { t: 0, pose: P({ lean: -0.3, crouch: 10, squash: 0.88, roll: -0.12, headTilt: 0.2, armF: [0.4, 1.4], armB: [1.1, 1.2], legF: [0.9, 0.4], legB: [-0.3, 0.2] }), ease: 'snap' as const },
+      { t: 6, pose: P({ lean: -0.42, crouch: 4, squash: 1.05, roll: -0.18, headTilt: 0.28, armF: [1.2, 1.0], armB: [0.3, 1.3], legF: [0.4, 0.2], legB: [-0.5, 0.4] }), ease: 'decel' as const },
       { t: 14, pose: P({ lean: -0.18, crouch: 6, squash: 1, roll: -0.06, headTilt: 0.1, armF: [0.6, 0.9], armB: [0.4, 0.8] }) },
     ],
   },
@@ -783,10 +823,10 @@ Object.assign(MOTIONS, {
   tumble: {
     loop: true, frames: 36,
     keys: [
-      { t: 0, pose: P({ lean: -0.35, roll: 0, armF: [1.6, 0.8], armB: [-1.5, 0.9], legF: [0.9, -0.9], legB: [-0.8, -0.5] }) },
-      { t: 12, pose: P({ lean: -0.4, roll: -2.1, armF: [2.2, 0.5], armB: [-2.1, 0.6], legF: [0.4, -1.2], legB: [-1.1, -0.9] }) },
-      { t: 24, pose: P({ lean: -0.35, roll: -4.2, armF: [1.1, 1.1], armB: [-1.0, 1.1], legF: [1.1, -0.6], legB: [-0.4, -0.2] }) },
-      { t: 36, pose: P({ lean: -0.35, roll: -6.283, armF: [1.6, 0.8], armB: [-1.5, 0.9], legF: [0.9, -0.9], legB: [-0.8, -0.5] }) },
+      { t: 0, pose: P({ lean: -0.35, roll: 0, armF: [1.6, 0.8], armB: [-1.5, 0.9], legF: [1.8, 0.9], legB: [-0.3, 0.5] }) },
+      { t: 12, pose: P({ lean: -0.4, roll: -2.1, armF: [2.2, 0.5], armB: [-2.1, 0.6], legF: [1.6, 1.2], legB: [-0.2, 0.9] }) },
+      { t: 24, pose: P({ lean: -0.35, roll: -4.2, armF: [1.1, 1.1], armB: [-1.0, 1.1], legF: [1.7, 0.6], legB: [-0.2, 0.2] }) },
+      { t: 36, pose: P({ lean: -0.35, roll: -6.283, armF: [1.6, 0.8], armB: [-1.5, 0.9], legF: [1.8, 0.9], legB: [-0.3, 0.5] }) },
     ],
   },
   // 倒地：转着摔下去、砸地时压扁、再缓缓塌住。roll 到 -1.45 是真正的躺平——
@@ -794,10 +834,10 @@ Object.assign(MOTIONS, {
   fallen: {
     loop: false, frames: 44,
     keys: [
-      { t: 0, pose: P({ lean: -0.3, crouch: 8, roll: -0.5, squash: 1.06, armF: [1.9, 0.7], armB: [-1.7, 0.8], legF: [1.0, -0.6], legB: [-0.9, -0.3] }), ease: 'accel' as const },
-      { t: 7, pose: P({ lean: -0.25, crouch: 16, roll: -1.45, squash: 0.82, armF: [2.3, 0.4], armB: [-2.1, 0.5], legF: [1.3, -0.25], legB: [-1.1, 0.05] }), ease: 'decel' as const },
-      { t: 16, pose: P({ lean: -0.22, crouch: 18, roll: -1.5, squash: 1.02, headTilt: -0.15, armF: [2.35, 0.3], armB: [-2.15, 0.4], legF: [1.28, -0.2], legB: [-1.08, 0.1] }), ease: 'decel' as const },
-      { t: 44, pose: P({ lean: -0.2, crouch: 18, roll: -1.5, squash: 1, headTilt: -0.2, armF: [2.3, 0.32], armB: [-2.1, 0.42], legF: [1.25, -0.18], legB: [-1.05, 0.12] }) },
+      { t: 0, pose: P({ lean: -0.3, crouch: 8, roll: -0.5, squash: 1.06, armF: [1.9, 0.7], armB: [-1.7, 0.8], legF: [1.6, 0.6], legB: [-0.6, 0.3] }), ease: 'accel' as const },
+      { t: 7, pose: P({ lean: -0.25, crouch: 16, roll: -1.45, squash: 0.82, armF: [2.3, 0.4], armB: [-2.1, 0.5], legF: [1.55, 0.25], legB: [-1.1, 0.05] }), ease: 'decel' as const },
+      { t: 16, pose: P({ lean: -0.22, crouch: 18, roll: -1.5, squash: 1.02, headTilt: -0.15, armF: [2.35, 0.3], armB: [-2.15, 0.4], legF: [1.48, 0.2], legB: [-1.08, 0.1] }), ease: 'decel' as const },
+      { t: 44, pose: P({ lean: -0.2, crouch: 18, roll: -1.5, squash: 1, headTilt: -0.2, armF: [2.3, 0.32], armB: [-2.1, 0.42], legF: [1.43, 0.18], legB: [-1.05, 0.12] }) },
     ],
   },
 });

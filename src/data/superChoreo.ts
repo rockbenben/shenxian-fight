@@ -12,7 +12,7 @@ import type { FxEvent, FxType } from '../engine/types';
 
 const P = (over: Partial<Pose>): Pose => ({
   lean: 0, crouch: 0, roll: 0, squash: 1, headTilt: 0,
-  armF: [0.2, 0.4], armB: [-0.2, 0.3], legF: [0.15, -0.1], legB: [-0.15, 0.1],
+  armF: [0.2, 0.4], armB: [-0.2, 0.3], legF: [0.25, 0.1], legB: [-0.15, 0.1],
   ...over,
 });
 
