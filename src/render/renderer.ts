@@ -38,14 +38,14 @@ export function onPartsLoaded(fn: () => void): () => void {
   return () => partsWaiters.delete(fn);
 }
 
-export function preloadParts(id: string, backArm = false): void {
+export function preloadParts(id: string, opts?: { backArm?: boolean; deco?: string }): void {
   if (partsCache.has(id)) return; // 已在探测中或已有结果，不重复发起
   partsCache.set(id, 'pending');
   // catch 是必须的：loadParts 抛出时（见 parts.ts 的 verticalBounds）原来会把这个 id
   // **永久留在 'pending'**——has(id) 挡住后续每一次重试，等待者一个都不触发，
   // 那个角色整场都是火柴人，且控制台只有一条 unhandled rejection。
   // 失败就把坑位删掉让下次能重来，并且照样通知一次，让立绘先按火柴人画出来。
-  loadParts(id, backArm)
+  loadParts(id, opts)
     .then(p => { partsCache.set(id, p); })
     .catch(() => { partsCache.delete(id); })
     .finally(() => { for (const w of [...partsWaiters]) w(); });
@@ -1860,6 +1860,20 @@ function drawDollLimbs(
   const bKnee = seg(ctx, a.hipX + (rig.legBDx ?? 0) * fc, a.hipY, p.legB[0], thigh, segHalfW(legFU), 0, fc, '', legFU, white, 0, legOv);
   const bAnk = seg(ctx, bKnee[0], bKnee[1], p.legB[0] - p.legB[1], shin, segHalfW(legFL), 0, fc, '', legFL, white, 0, legOv);
   drawDollFoot(ctx, bAnk, fc, footF, k, rig.footAnchorX, white);
+
+  // ---- 身后的附属件（尾巴 / 翅膀）：画在躯干后面 ----------------------------
+  // 悟空的尾巴、雷震子的翅膀在整人那张画上是**独立的一块**（与身体、手臂之间有背景缝），
+  // 所以能单独切出来。位置由 rig.deco 量好：横向相对中轴，纵向离地。
+  const deco = rig.deco ? doll[rig.deco.part] : undefined;
+  if (deco && rig.deco) {
+    const dw = (deco.right - deco.left) * k, dh = (deco.bottom - deco.top) * k;
+    ctx.save();
+    ctx.translate(a.hipX + rig.deco.dx * fc, feetY - rig.deco.y);
+    ctx.scale(fc, 1);
+    ctx.drawImage(deco.img, deco.left, deco.top,
+      deco.right - deco.left, deco.bottom - deco.top, -dw / 2, 0, dw, dh);
+    ctx.restore();
+  }
 
   // ---- 前臂几何：兵器要用 -------------------------------------------------
   const fElbow = segEnd(a.nshX, a.nshY, p.armF[0], upperArm, fc);

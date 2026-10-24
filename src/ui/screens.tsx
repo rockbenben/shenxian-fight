@@ -762,7 +762,7 @@ function CardPortrait({ def }: { def: CharacterDef }) {
     // 立绘只画一次，而部件是异步探测的——第一次画的时候素材通常还没到，
     // 画出来就是火柴人且永不更新（对局每帧重画，所以那边看不出这个问题）。
     // 所以主动发起探测，并在加载完成时补画一次。
-    preloadParts(def.id, !!def.build?.rig?.backArm);
+    preloadParts(def.id, { backArm: !!def.build?.rig?.backArm, deco: def.build?.rig?.deco?.part });
     return onPartsLoaded(paint);
   }, [def]);
   return (

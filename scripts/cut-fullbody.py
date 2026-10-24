@@ -48,7 +48,7 @@ def is_magenta(r, g, b):
     return r > 110 and b > 110 and g < min(r, b) * 0.72
 
 
-def load_clean(path, max_h=700):
+def load_clean(path, max_h=700, keep_border=False):
     """读原图，抠掉背景，裁到内容框；**并把高度压到 max_h**。
 
     为什么压：原图是 2K（1696×2528），切出来的躯干那一块能有 1000 多像素高。
@@ -60,6 +60,10 @@ def load_clean(path, max_h=700):
     牛魔王那张的背景是带噪点的深品红（#B72F71 一带），按颜色判会漏下一片噪点，
     噪点把「手臂与身体之间那道缝」糊住——于是手臂和身体在像素上又连成了一段，
     切线就分不开了（实测他的手臂块怎么切都带着一条躯干）。按连通域删背景与颜色无关。
+
+    keep_border：**不删与边缘相连的连通域**（只删飞点）。
+    尾巴、翅膀这类附属件常常紧贴画幅边缘——按默认规则它们被当成背景整个删掉
+    （雷震子的翅膀就是这么没的）。附属件那一块要走这条。
     """
     from scipy import ndimage
     im = Image.open(path).convert('RGBA')
@@ -80,14 +84,17 @@ def load_clean(path, max_h=700):
     else:
         bb = (0, 0, W, H)
     # 去噪点：与画面边缘相连的是背景；零星的小块是背景的飞点。两者都删。
+    # keep_border：附属件（尾巴/翅膀）常常紧贴画幅边缘，按这条会被整个当成背景删掉，
+    # 所以那一条只给主体走。
     lab, n = ndimage.label(solid, structure=np.ones((3, 3)))
     if n:
         border = set(lab[0, :].tolist()) | set(lab[-1, :].tolist()) | \
             set(lab[:, 0].tolist()) | set(lab[:, -1].tolist())
         border.discard(0)
         keep = np.ones_like(lab, dtype=bool)
-        for b in border:
-            keep &= lab != b
+        if not keep_border:
+            for b in border:
+                keep &= lab != b
         sizes = np.bincount(lab.ravel())
         for lbl in range(1, n + 1):
             if lbl not in border and sizes[lbl] < 60:   # 飞点
@@ -436,6 +443,27 @@ def cut_one(cid, spec, verbose=True):
         for name, y0, y1, xr in bsegs:
             pieces[name] = crop_pct(im, xr[0], y0, xr[1], y1)
 
+    # ---- 身后的附属件（尾巴 / 翅膀）------------------------------------------
+    # 悟空的尾巴、雷震子的翅膀在画里是**独立的一块**（与身体、手臂之间有一道背景缝），
+    # 所以能单独切出来，画在躯干后面。spec 里写 deco: [部件名, [x0,y0,x1,y1]]。
+    deco_geo = None
+    if 'deco' in spec:
+        dname, dbox = spec['deco'][0], spec['deco'][1]
+        dx0, dy0, dx1, dy1 = dbox
+        # 附属件常常紧贴画幅边缘（尾巴在左下、翅膀在左上），按主体那套清理规则
+        # 会被当成背景整个删掉 —— 这一块单独走「保留贴边件」那张图。
+        # 两次清理的**内容框与缩放完全一致**（内容框在删连通域之前算好），所以坐标通用。
+        dimg = load_clean(src, keep_border=True)
+        if 'box' in spec:
+            b = spec['box']
+            dimg = crop_pct(dimg, b[0], b[1], b[2], b[3])
+        piece = crop_pct(dimg, dx0, dy0, dx1, dy1)
+        pieces[dname] = piece
+        dbox_t = trim_box(piece)
+        dcx = X(dx0) + (dbox_t[0] + dbox_t[2]) / 2
+        dtop = Y(dy0) + dbox_t[1]
+        deco_geo = (dname, dcx, dtop)
+
     # ---- 头 / 躯干 / 腿 / 脚 ------------------------------------------------
     pieces['head'] = crop_pct(im, spec['head'][0], spec['head'][1], spec['head'][2], spec['head'][3])
     # 头件的底带：有些角色（牛魔王）**肩膀长到耳朵边上**，头件切矩形会带进一块肩甲，
@@ -469,6 +497,14 @@ def cut_one(cid, spec, verbose=True):
     # 渲染层据此决定要不要多探三个远臂件——不探就是必然 404。
     if 'armB' in spec:
         rig['backArm'] = True
+    # 身后的附属件（尾巴/翅膀）：位置等 k 与中轴定了再算
+    if deco_geo:
+        dname, dcx, dtop = deco_geo
+        rig['deco'] = {
+            'part': dname,
+            'dx': (dcx - axis_px) * k,
+            'y': (H - dtop) * k,      # 离地（逻辑单位）
+        }
     for name, piece in pieces.items():
         piece.save(os.path.join(outdir, f'{name}.png'))
         tb = trim_box(piece)

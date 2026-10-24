@@ -265,8 +265,10 @@ function Fight({ scene, run, diff, attempt, onEnd, onExit }: {
   // backArm：画里两条胳膊都画全了的那几个角色另有一套远臂件，要多探三个文件；
   // 其余角色没有这三个文件，探了就是必然 404（选人页一次预载十二个人 = 三十六个白跑请求）。
   useEffect(() => {
-    preloadParts(battle.p1.def.id, !!battle.p1.def.build?.rig?.backArm);
-    preloadParts(battle.p2.def.id, !!battle.p2.def.build?.rig?.backArm);
+    for (const f of [battle.p1, battle.p2]) {
+      const rig = f.def.build?.rig;
+      preloadParts(f.def.id, { backArm: !!rig?.backArm, deco: rig?.deco?.part });
+    }
   }, [battle]);
   // 外部骨骼动画同样是可选增强：探测 public/skel/<id>.json，没有就一直走程序化动作
   useEffect(() => { loadSkeleton(battle.p1.def.id); loadSkeleton(battle.p2.def.id); }, [battle]);

@@ -19,7 +19,7 @@ test('public/chars 里的每个文件都在探测列表内，且命名合规', (
   // 远臂那三件（armBU/armBL/handB）只有画里两条胳膊都画全了的角色才有，
   // 按角色有没有（rig.backArm）来探——其余角色探了就是必然 404。
   const DOLL_PROBED = ['head', 'torso', 'armFU', 'armFL', 'handF', 'legFU', 'legFL', 'footF',
-    'armBU', 'armBL', 'handB'];
+    'armBU', 'armBL', 'handB', 'tail', 'wing'];
   const root = 'public/chars';
   expect(fs.existsSync(root), 'public/chars 不见了').toBe(true);
 
