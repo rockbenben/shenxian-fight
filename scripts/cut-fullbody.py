@@ -197,27 +197,6 @@ def flood_mask(im, seed, outline_lum=OUTLINE_LUM):
     return lab == v
 
 
-def color_mask(im, seed, tol=46):
-    """按**颜色**取一块：与种子点同色的连通域。
-
-    为什么需要它：猪八戒、牛魔王的胳膊**贴着肚子**，画里没有缝可分——
-    连通域（按描边分）对深肤色角色直接失效（肤色比描边阈值还暗，整条胳膊成了墙）。
-    但胳膊的**肤色**与袍子不同，按颜色分就分得开。
-    代价：描边不在"同色"里，胳膊外缘的黑边会被吃掉一点（手臂略淡）。
-    """
-    from scipy import ndimage
-    arr = np.array(im.convert('RGB')).astype(int)
-    r0, g0, b0 = arr[seed[1], seed[0]]
-    d = np.max(np.abs(arr - np.array([r0, g0, b0])), axis=2)
-    m = d <= tol
-    m &= (np.array(im.getchannel('A')) > 8)
-    lab, n = ndimage.label(m, structure=np.ones((3, 3)))
-    v = lab[seed[1], seed[0]]
-    if v == 0:
-        return None
-    return lab == v
-
-
 def trim_box(im, threshold=10):
     """内容包围盒。阈值与 src/render/parts.ts 的 trimBox 一致（10）——
     两边裁得不一样，渲染层算出的宽高就和这里对不上，贴图会被抻。"""
@@ -360,7 +339,7 @@ def cut_one(cid, spec, verbose=True):
             seed = ((a + b) // 2, elbow_y)
         if seed is None:
             seed = (X((spec['arm'][0] + spec['arm'][1]) / 2), elbow_y)
-        arm_mask = color_mask(im, seed) if arm_mode == 'color' else flood_mask(im, seed)
+        arm_mask = flood_mask(im, seed)
         if arm_mask is not None:
             from scipy import ndimage
             # 描边不在"同色"里，胀 2 像素把它捞回来（不然手臂外缘没有黑边，看着发白）
