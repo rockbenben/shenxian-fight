@@ -4,6 +4,7 @@ import type { CharacterDef, Fighter } from '../engine/types';
 import { INK } from './palette';
 import { samplePose } from './motion';
 import { hexAlpha, poseForFighter, shoulderAnchor, torsoAnchors } from './renderer';
+import { dollModeOn } from './parts';
 
 /** 角色身上的"活物"层：飘带、余烬、满槽气环、脚下扬尘、地面痕迹。
  *
@@ -352,12 +353,17 @@ export function drawAdornments(ctx: CanvasRenderingContext2D, b: Battle, layer: 
       // 画不画、画成什么样，全在 auraLook 里（纯函数，可测）
       if (ad.aura) drawAura(ctx, f, ad.aura, state.frame);
       if (ad.wings) {
-        const wp = poseForFighter(f);
-        // 纸偶角色的肩点是**这个人自己的**（build.rig），用共用骨架的肩点
-        // 翅膀就挂不到肩膀上——画面上等于没有翅膀。
-        const wa = shoulderAnchor(f.x, FLOOR_Y - f.y, wp.lean, wp.crouch, f.facing,
-          f.def.build?.rig);
-        drawWings(ctx, ad.wings, wa[0], wa[1], f.facing, f.y, state.frame);
+        // 纸偶版里雷震子的翅膀是**画出来的**（整人那张画上切下来的一块），
+        // 程序化的一对羽扇就不要再画一遍——两套翅膀叠在一起，画面上是两双翅膀。
+        const painted = dollModeOn() && f.def.build?.rig?.deco?.part === 'wing';
+        if (!painted) {
+          const wp = poseForFighter(f);
+          // 纸偶角色的肩点是**这个人自己的**（build.rig），用共用骨架的肩点
+          // 翅膀就挂不到肩膀上——画面上等于没有翅膀。
+          const wa = shoulderAnchor(f.x, FLOOR_Y - f.y, wp.lean, wp.crouch, f.facing,
+            f.def.build?.rig);
+          drawWings(ctx, ad.wings, wa[0], wa[1], f.facing, f.y, state.frame);
+        }
       }
       const defs = ad.sashes ?? [];
       defs.forEach((d, i) => {
