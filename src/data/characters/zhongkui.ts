@@ -51,6 +51,13 @@ export const ZHONGKUI: CharacterDef = {
   id: 'zhongkui', name: '钟馗', hp: 205, speed: 4.5, jumpVel: 15,
   width: 58, height: 156,
   palette: { main: '#6b3a6e', accent: '#e8d9b0' },
+  // 体型：四肢粗细 / 手形 / 装束。判官：魁梧，官袍是广袖。
+  // 此前十二个人共用同一套四肢几何（同样粗、同样一颗圆手），只有颜色不同——
+  // 于是十二个人看着像同一副假人换了个色。
+  // 头身比：内容框 110×124、脸 45×53（源像素，量的——工具见 scripts/measure-heads.py）——
+  // 幞头两侧的翅把框撑宽（脸只占框宽的四成）。
+  // 归一只用一条锚（内容盒高 = 头高），脸只管横向挂点与下巴接缝。
+  build: { rig: { k: 0.22, chinY: 121.7, shoulderY: 117, hipY: 44.88, shoulderDx: -22.68, backShoulderDx: 17.87, headDx: -4.626, legFDx: 7.094, legBDx: -12.49, footAnchorX: 0.3658, face: [103, 62, 57, 69], upperArm: 32.34, lowerArm: 18.48, handLen: 13.86, thigh: 18.26, shin: 18.26, torsoLen: 76.78 }, shoulderDx: -17.1, shoulderDy: 4.2, arm: 1.25, leg: 1.2, hand: 'fist', sleeve: 'cuff', face: [60, 39, 45, 53], head: 1.0 },
   weapon: { kind: 'sword', len: 92, grip: 0.3, shaft: '#4a2b4c', edge: '#c8443c' }, // 判官剑
   adorn: {
     // 官袍的宽袖与绦带：最宽、最沉，摆动幅度小——他不是靠身法的人

@@ -42,6 +42,15 @@ export const NEZHA: CharacterDef = {
   role: '速度 · 连段', id: 'nezha', name: '哪吒', hp: 200, speed: 5.6, jumpVel: 17,
   width: 52, height: 148,
   palette: { main: '#d8383f', accent: '#ffd9a0' },
+  // 体型：四肢粗细 / 手形 / 装束。少年身量：细胳膊细腿。哪吒是十二个人里最灵的，手脚都该比牛魔王细一圈。
+  // 此前十二个人共用同一套四肢几何（同样粗、同样一颗圆手），只有颜色不同——
+  // 于是十二个人看着像同一副假人换了个色。
+  // 头身比：头贴图按素材契约重出（黑双髻+红抹额，飘带不再压脸），内容框 119×124、
+  // 脸 52×59（源像素，量的——工具见 scripts/measure-heads.py）。
+  // 归一只有一条锚：**内容盒高就是头高**（契约保证头填满画幅），脸不再当尺子，
+  // 只管两件事——横向挂点（脸心对齐身体中轴）与下巴到画幅底边的距离（脖子接缝）。
+  // 1.12 是特质倍率：小孩的头本来就该比大人显眼。
+  build: { rig: { k: 0.22, chinY: 115.5, shoulderY: 107.8, hipY: 29.26, shoulderDx: -10.74, backShoulderDx: 11.18, headDx: -5.747, legFDx: 6.891, legBDx: -13.35, footAnchorX: 0.1877, face: [72, 72, 107, 103], upperArm: 31.68, lowerArm: 16.94, handLen: 12.32, thigh: 7.48, shin: 7.48, torsoLen: 86.24 }, shoulderDx: -11.2, shoulderDy: 3.8, arm: 0.85, leg: 0.85, hand: 'fist', sleeve: 'none', face: [55, 40, 52, 59], head: 1.12 },
   weapon: { kind: 'spear', len: 96, grip: 0.28, shaft: '#8a5a3a', edge: '#ff8c2b' }, // 火尖枪
   adorn: {
     // 混天绫：肩上一条长红绫，是哪吒最有辨识度的一件东西

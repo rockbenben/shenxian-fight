@@ -52,7 +52,12 @@ export type FighterState = 'idle' | 'walk' | 'jump' | 'attack' | 'hitstun' | 'bl
 /** 下蹲时受击框高度（绝对值，不按角色身高取百分比——身高不同会导致同一招对不同角色时躲时不躲） */
 export const CROUCH_HEIGHT = 68;
 
-export type FxType = 'burst' | 'trail' | 'beam' | 'ring' | 'spark' | 'flash' | 'glyph' | 'shockwave' | 'crescent' | 'bolt';
+export type FxType = 'burst' | 'trail' | 'beam' | 'ring' | 'spark' | 'flash' | 'glyph' | 'shockwave' | 'crescent' | 'bolt'
+  // 打击感三件套（都只在"命中"这一下出现，招式自带的时间轴里不用）：
+  //  · hitflash  接触点闪光：最亮的那一小团白
+  //  · shard     方向性亮片：沿受力方向甩出去（圆点粒子是"炸开"，亮片才是"被打中"）
+  //  · impactring 受力方向的压扁冲击环
+  | 'hitflash' | 'shard' | 'impactring';
 
 /** frame 相对招式起始帧；x/y 相对出招者脚底（面朝右） */
 export interface FxEvent {
@@ -178,6 +183,49 @@ export interface WeaponDef {
   edge: string;
 }
 
+/**
+ * 纸偶骨架尺寸（逻辑单位，150 基准空间）。
+ *
+ * 由 design-preview/tools/cut-fullbody.py 从整人一张画里量出来：
+ * 画里每一块的像素尺寸 × k 就是这里的逻辑尺寸，渲染层按 1:1 挂载，
+ * 贴图不会被抻、比例不会被骨架改写。
+ */
+export interface CharacterRig {
+  /** 源像素 → 逻辑单位（画整高 154 个逻辑单位，与共用骨架同一基准） */
+  k: number;
+  /** 下巴离地 */
+  chinY: number;
+  /** 肩点离地 */
+  shoulderY: number;
+  /** 腿根（= 衣摆下沿）离地 */
+  hipY: number;
+  /** 近肩相对身体中轴的横向偏移（负 = 画面左，近侧） */
+  shoulderDx: number;
+  /** 后肩相对身体中轴的横向偏移（正 = 画面右，背向镜头那一侧） */
+  backShoulderDx: number;
+  /** 头件裁剪框中心相对身体中轴的横向偏移（逻辑单位）。
+   *
+   * 为什么不用「脸心对齐中轴」那条老规矩：那条规矩是给**单独画的肖像**准备的
+   * （头冠、飘带全长在左边，要把脸心挪到中轴上）。纸偶的头是从整人一张画上裁下来的，
+   * 脸相对身体的位置本来就是对的（角色朝右，脸心在中轴右边），再对齐一次等于
+   * 把整个头平移半个头宽——实测悟空偏了 12% 身高的横向量。 */
+  headDx: number;
+  /** 前腿/后腿各自相对身体中轴的横向偏移（画里两条腿是岔开的） */
+  legFDx: number;
+  legBDx: number;
+  /** 踝在脚件里的横向位置（0=脚件左缘，1=右缘） */
+  footAnchorX: number;
+  /** 头件里"脸"的框（源像素 x,y,宽,高）——头按脸挂到身体中轴上 */
+  face?: [number, number, number, number];
+  /** 骨段长度（逻辑单位）：上臂 / 前臂 / 手 / 大腿 / 小腿 / 躯干（下巴→腿根） */
+  upperArm: number;
+  lowerArm: number;
+  handLen: number;
+  thigh: number;
+  shin: number;
+  torsoLen: number;
+}
+
 export interface CharacterDef {
   /** 胜负台词。街机格斗里这是角色性格最直接的载体——四个对手打完只给一个「胜/败」，
    * 谁是谁完全没有分别。win 是他赢下这一关时说的，lose 是他被打败时说的。 */
@@ -263,6 +311,77 @@ export interface CharacterDef {
   };
   /** 大招火焰纹背光/速度线的配色：[内环, 外缘]。不给则回退到默认藤黄→朱砂 */
   superGlow?: [string, string];
+  /**
+   * 体型：四肢的粗细、手形、装束。
+   *
+   * 十二个人此前共用**同一套四肢几何**——同样粗、同样锥度、同样长度、同样一颗圆手，
+   * 只有颜色不同。于是十二个人看着像同一副假人换了个色：猪八戒的胳膊和哪吒的一样细，
+   * 白骨精的手和孙悟空的一样圆。
+   *
+   * 这里给每人自己的比例。粗细倍率是**倍率**（1 = 现状），不是绝对值——骨架长度是
+   * 全员共用的（头与躯干贴图的尺寸就锁死了它），能变的只有粗细与末端。
+   */
+  build?: {
+    /**
+     * **纸偶骨架尺寸**：整人一张画、在关节处切开动时用的**这个人自己的**骨架。
+     *
+     * 为什么不能继续用十二人共用那副骨架（肩 118、髋 62、上臂 26、大腿 32）：
+     * 纸偶件是按画里的原尺寸切下来的，挂上去时若按共用骨架抻，猪八戒画里 15% 高的
+     * 短腿会变成 64 单位的长腿、小孩的短手臂会被抻长——比例一丢，"整人一张画"
+     * 就只剩"同一套颜色"的意思了。所以这里给每人自己的尺寸，渲染层按它 1:1 落位。
+     *
+     * 数值由 design-preview/tools/cut-fullbody.py 从画里量出来（切线位置在
+     * design-preview/tools/fullbody-spec.json，人眼在网格图上读）。
+     */
+    rig?: CharacterRig;
+    /** 上臂/前臂粗细倍率 */
+    arm?: number;
+    /** 大腿/小腿粗细倍率 */
+    leg?: number;
+    /**
+     * 手：拳 / 爪 / 掌 / 骨手。手是隔着屏幕认人的第一眼（比脸还小，但一直在动），
+     * 十二个人十二种手，比十二套配色管用。
+     */
+    hand?: 'fist' | 'claw' | 'paw' | 'bone';
+    /** 手臂上的装束：袖口 / 护腕 / 毛边。光溜溜的锥形色管是"假人"的主因，袖口与毛边是最快的解 */
+    sleeve?: 'cuff' | 'bracer' | 'fur' | 'none';
+    /**
+     * **头贴图里"脸"的框**（源像素 x, y, 宽, 高）。
+     *
+     * 为什么需要它：头贴图是"脸 + 装饰"——哪吒的抹额飘带、二郎神的天冠、铁扇的高髻、
+     * 白骨精的头饰，各自带一大片内容。而**装饰全长在左边**（飘带、翎羽、帽翅），
+     * 量出来的脸心比整幅中心偏右 6~31 像素（哪吒 23、悟空 28.5、白骨精 31.5）。
+     *
+     * 两件事都要靠它：
+     *   1. **归一**：只按整幅内容盒归一，装饰占得多的人脸就小（实测哪吒的脸
+     *      只有 16.5 逻辑单位宽，铁扇公主 12.5——差 1.32 倍，而两人的身体一模一样）。
+     *   2. **挂点**：按整幅居中挂到颈点，脸就被推到身体中轴右边 2~10 像素——
+     *      脖子接在**耳朵**那一侧，头看着就不在身体上。改按脸心对齐，
+     *      装饰就甩到身侧去了（哪吒那条混天绫拖在身后，正该如此）。
+     *
+     * 数值是**量出来的**，量法与工具见 scripts/measure-heads.py（自动取肤色连通域，
+     * 哪吒与牛魔王两处手工兜底，理由写在脚本里）。素材重出或重切之后要重量一遍。
+     */
+    face?: [number, number, number, number];
+    /**
+     * **近肩肩头的位置**（逻辑单位，相对身体中轴与肩点）。
+     *
+     * 躯干是画出来的、手臂是程序化的圆柱，两者接不接得住全看肩点落在哪。
+     * 这两个数是**从躯干素材上量出来的**（design-preview/tools/write-shoulder.py），
+     * 不是猜的：素材把肩头画在哪儿，手臂就挂在哪儿——素材画歪了也是对的。
+     * 纵向那个 dy 尤其要紧：肩头中心比肩点低 3~6 个单位，手臂的圆帽若落在颈点高度，
+     * 就会和脖子糊成一根柱子。
+     */
+    shoulderDx?: number;
+    shoulderDy?: number;
+    /**
+     * **角色特质的头身比倍率**（1 = 按量出来的脸归一后的原样）。
+     *
+     * 归一化负责"大家齐"，这个倍率负责"谁跟谁不一样"——小孩的头本来就该更大一点
+     * （哪吒、红孩儿），猪八戒身子最肥、头反而该小一点。不给就是 1。
+     */
+    head?: number;
+  };
   /** 大招火焰纹背光的花瓣形态。不给则回退到原始 14 瓣基准形态 */
   superAura?: SuperAura;
   /**
@@ -381,11 +500,23 @@ export interface Fighter {
   lowGuard: boolean;
   invuln: number;    // 无敌剩余帧
   flash: number;     // 受击白闪剩余帧（渲染读取）
+  /**
+   * 受击形变剩余帧（渲染读取）。被打中的一瞬间身体沿受力方向拉一下。
+   *
+   * 这是打击感里最容易被漏掉的一项：只有粒子与震屏时，角色像一张贴纸被推动；
+   * 有了这一下挤压拉伸，这一击才有"砸进去"的重量。
+   */
+  impact: number;
   cooldowns: Record<string, number>; // moveId -> 剩余帧
 }
 
 export type BattleEvent =
-  | { type: 'hit'; attacker: 0 | 1; damage: number; x: number; y: number; blocked: boolean; heavy: boolean; counter?: boolean }
+  | {
+    type: 'hit'; attacker: 0 | 1; damage: number; x: number; y: number; blocked: boolean; heavy: boolean;
+    counter?: boolean;
+    /** 这是不是多段招式的最后一下。最后一下要更响（渲染层据此加码） */
+    final?: boolean;
+  }
   | { type: 'throw'; attacker: 0 | 1 }
   | { type: 'super'; who: 0 | 1; tier: 50 | 100 }
   | { type: 'moveStart'; who: 0 | 1; move: Move }

@@ -3,7 +3,7 @@ import type { Battle, } from '../engine/battle';
 import type { CharacterDef, Fighter } from '../engine/types';
 import { INK } from './palette';
 import { samplePose } from './motion';
-import { hexAlpha, poseForFighter, torsoAnchors } from './renderer';
+import { hexAlpha, poseForFighter, shoulderAnchor, torsoAnchors } from './renderer';
 
 /** 角色身上的"活物"层：飘带、余烬、满槽气环、脚下扬尘、地面痕迹。
  *
@@ -353,8 +353,11 @@ export function drawAdornments(ctx: CanvasRenderingContext2D, b: Battle, layer: 
       if (ad.aura) drawAura(ctx, f, ad.aura, state.frame);
       if (ad.wings) {
         const wp = poseForFighter(f);
-        const wa = torsoAnchors(f.x, FLOOR_Y - f.y, wp.lean, wp.crouch, f.facing);
-        drawWings(ctx, ad.wings, wa.shX, wa.shY, f.facing, f.y, state.frame);
+        // 纸偶角色的肩点是**这个人自己的**（build.rig），用共用骨架的肩点
+        // 翅膀就挂不到肩膀上——画面上等于没有翅膀。
+        const wa = shoulderAnchor(f.x, FLOOR_Y - f.y, wp.lean, wp.crouch, f.facing,
+          f.def.build?.rig);
+        drawWings(ctx, ad.wings, wa[0], wa[1], f.facing, f.y, state.frame);
       }
       const defs = ad.sashes ?? [];
       defs.forEach((d, i) => {

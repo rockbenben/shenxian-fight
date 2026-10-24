@@ -57,6 +57,13 @@ export const ERLANG: CharacterDef = {
   // 容易十倍（13% vs 1%）。s1 收招 16→24、s2 15→20，让"够不着"至少能换来"抓得到"。
   role: '远程 · 长手', id: 'erlang', name: '二郎神', hp: 195, speed: 4.6, jumpVel: 16,
   width: 54, height: 152, palette: { main: '#3f6bd8', accent: '#e8ecff' },
+  // 体型：四肢粗细 / 手形 / 装束。天将：修长匀称，前臂一道护腕（三尖两刃刀要握得住）。
+  // 此前十二个人共用同一套四肢几何（同样粗、同样一颗圆手），只有颜色不同——
+  // 于是十二个人看着像同一副假人换了个色。
+  // 头身比：内容框 77×124、脸 42×65（源像素，量的——工具见 scripts/measure-heads.py）。
+  // 天冠把框撑得又高又窄（脸只占框宽的一半多），但归一只用一条锚（内容盒高 = 头高），
+  // 脸只管横向挂点与下巴接缝——天冠与脸同比例缩放，不会被拉成一条竖板。
+  build: { rig: { k: 0.22, chinY: 120.1, shoulderY: 114, hipY: 22.88, shoulderDx: -21.27, backShoulderDx: 16.68, headDx: -1.144, legFDx: 8.646, legBDx: -11.15, footAnchorX: 0.5871, face: [46, 80, 55, 74], upperArm: 33.88, lowerArm: 15.4, handLen: 15.4, thigh: 4.62, shin: 4.84, torsoLen: 97.24 }, shoulderDx: -14.0, shoulderDy: 4.7, arm: 0.95, leg: 0.95, hand: 'fist', sleeve: 'bracer', face: [59, 38, 42, 65], head: 1.0 },
   weapon: { kind: 'glaive', len: 104, grip: 0.3, shaft: '#4a5a7a', edge: '#dfe8ff' }, // 三尖两刃刀
   adorn: {
     // 战袍后摆：长而挺，摆动比哪吒的绫子沉

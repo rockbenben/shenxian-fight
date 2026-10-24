@@ -71,6 +71,13 @@ export const NIUMO: CharacterDef = {
   endingHard: '他把混铁棍插在山口，转身回洞。芭蕉扇还在夫人手里——这一次他没有开口去借。',
   role: '力量 · 耐打', id: 'niumo', name: '牛魔王', hp: 215, speed: 3.8, jumpVel: 14,
   width: 64, height: 160, palette: { main: '#7a4a2b', accent: '#e8c9a0' },
+  // 体型：四肢粗细 / 手形 / 装束。牛魔王：全场最粗的胳膊。十二个人共用一套四肢时，他是唯一显不出来的。
+  // 此前十二个人共用同一套四肢几何（同样粗、同样一颗圆手），只有颜色不同——
+  // 于是十二个人看着像同一副假人换了个色。
+  // 头身比：内容框 114×123、脸 48×39（源像素，量的——工具见 scripts/measure-heads.py；
+  // 这张脸的肤色被胡子吃掉大半，量的地方是眉到下颌那一块）。牛角与胡子是头的一部分，
+  // 跟着整颗头一起缩放——归一只用一条锚（内容盒高 = 头高），脸只管挂点与接缝。
+  build: { rig: { k: 0.22, chinY: 115.5, shoulderY: 109.3, hipY: 27.72, shoulderDx: -28.84, backShoulderDx: 27.39, headDx: 0.814, legFDx: 12.43, legBDx: -14.41, footAnchorX: 0.4178, face: [142, 117, 74, 56], upperArm: 32.34, lowerArm: 18.48, handLen: 15.4, thigh: 7.04, shin: 7.26, torsoLen: 87.78 }, shoulderDx: -15.7, shoulderDy: 5.5, arm: 1.5, leg: 1.5, hand: 'fist', sleeve: 'none', face: [59, 50, 48, 39], head: 1.0 },
   weapon: { kind: 'mace', len: 78, grip: 0.34, shaft: '#5a4030', edge: '#d8a05c' }, // 混铁棍
   adorn: {
     // 腰间兽皮与铁链：短、重、甩得慢

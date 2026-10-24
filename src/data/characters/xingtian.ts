@@ -50,6 +50,10 @@ export const XINGTIAN: CharacterDef = {
   // 「头没了，手还在」那句胜利台词，画面上得先兑现
   headless: true,
   palette: { main: '#8c3b2a', accent: '#d8c08a' },
+  // 体型：四肢粗细 / 手形 / 装束。巨人：断首之后只剩更粗的臂膀来压人。
+  // 此前十二个人共用同一套四肢几何（同样粗、同样一颗圆手），只有颜色不同——
+  // 于是十二个人看着像同一副假人换了个色。
+  build: { shoulderDx: -14.2, shoulderDy: 4.9, arm: 1.4, leg: 1.4, hand: 'fist', sleeve: 'none' },
   weapon: { kind: 'axe', len: 96, grip: 0.34, shaft: '#5a3a2a', edge: '#b08d57' }, // 戚（斧）
   adorn: {
     sashes: [

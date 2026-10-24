@@ -63,6 +63,13 @@ export const HONGHAIER: CharacterDef = {
   // 实测总胜率 26%（门槛 35%）。血与伤害都补回半档，代价只留在攻程上。
   width: 46, height: 128,
   palette: { main: '#e03a2c', accent: '#ffd08a' },
+  // 体型：四肢粗细 / 手形 / 装束。与哪吒同辈同身量：两个人该有同一副骨架的粗细。
+  // 此前十二个人共用同一套四肢几何（同样粗、同样一颗圆手），只有颜色不同——
+  // 于是十二个人看着像同一副假人换了个色。
+  // 头身比：内容框 89×124、脸 44×51（源像素，量的——工具见 scripts/measure-heads.py）。
+  // 归一只用一条锚（内容盒高 = 头高），脸只管挂点与接缝；1.18 是特质倍率：
+  // 小孩的头本来就该比大人显眼（哪吒 1.12、红孩儿 1.18，八戒反着来 0.92）。
+  build: { rig: { k: 0.22, chinY: 103.2, shoulderY: 98.56, hipY: 21.56, shoulderDx: -16.34, backShoulderDx: 7.452, headDx: -6.704, legFDx: 8.443, legBDx: -9.158, footAnchorX: 0.4097, face: [113, 116, 89, 115], upperArm: 30.36, lowerArm: 13.86, handLen: 12.32, thigh: 5.06, shin: 4.84, torsoLen: 81.62 }, shoulderDx: -9.7, shoulderDy: 5.3, arm: 0.85, leg: 0.85, hand: 'fist', sleeve: 'none', face: [56, 55, 44, 51], head: 1.18 },
   // 火尖枪。与哪吒同名同形，但短一截（78 对 96）、握点更靠后：他是个孩子，抡不动长的
   weapon: { kind: 'spear', len: 78, grip: 0.34, shaft: '#7a3a22', edge: '#ff9a2b' },
   adorn: {

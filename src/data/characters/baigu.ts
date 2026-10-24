@@ -58,6 +58,13 @@ export const BAIGU: CharacterDef = {
   id: 'baigu', name: '白骨精', hp: 196, speed: 5.2, jumpVel: 17,
   width: 48, height: 146,
   palette: { main: '#7d8a84', accent: '#e8e4d6' },
+  // 体型：四肢粗细 / 手形 / 装束。白骨精：最细，手是骨手——没有肉。
+  // 此前十二个人共用同一套四肢几何（同样粗、同样一颗圆手），只有颜色不同——
+  // 于是十二个人看着像同一副假人换了个色。
+  // 头身比：内容框 91×124、脸 36×58（源像素，量的——工具见 scripts/measure-heads.py）。
+  // 归一只有一条锚：**内容盒高就是头高**（素材契约保证头填满画幅），脸不再当尺子，
+  // 只管横向挂点（脸心对齐身体中轴）与下巴到画幅底边的距离（脖子接缝）。
+  build: { rig: { k: 0.2292, chinY: 120.1, shoulderY: 112.4, hipY: 12.15, shoulderDx: -18.33, backShoulderDx: 20.16, headDx: 1.775, legFDx: 11.22, legBDx: -8.258, footAnchorX: 0.4083, face: [42, 66, 58, 62], upperArm: 27.73, lowerArm: 18.56, handLen: 9.167, thigh: 2.979, shin: 2.979, torsoLen: 108 }, shoulderDx: -13.0, shoulderDy: 6.1, arm: 0.7, leg: 0.7, hand: 'bone', sleeve: 'none', face: [68, 39, 36, 58], head: 1.0 },
   // 骨爪不是杆兵器：len 最短、握点几乎在根部，画面上只探出一截白骨
   weapon: { kind: 'sword', len: 54, grip: 0.12, shaft: '#c9c3b2', edge: '#e8e4d6' }, // 短骨剑
   adorn: {

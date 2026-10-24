@@ -1,4 +1,10 @@
-export type PartName = 'head' | 'torso' | 'armF' | 'armB' | 'legF' | 'legB' | 'weapon';
+export type PartName =
+  | 'head' | 'torso'
+  // 纸偶件（整人一张画、在关节处切出来）：每一段各一张。
+  // 远侧（背向镜头的那条）复用近侧的图——它多半被身体挡着，单独切一套只是多一倍请求。
+  | 'armFU' | 'armFL' | 'handF' | 'legFU' | 'legFL' | 'footF'
+  // 旧的一套（整条肢体一张图）：留着是为了老素材还能用，也为了纸偶件没到位时能回退
+  | 'armF' | 'armB' | 'legF' | 'legB' | 'weapon';
 
 /** 探测成功的部件：图片本体 + 裁掉上下透明留白后的内容行范围（图片像素坐标，[top, bottom)）。
  * 只裁纵向——头/躯干的接缝是纵向现象（脖子、腰），横向留白跟接缝无关，裁横向反而会把非方形
@@ -18,15 +24,58 @@ export interface PartImage {
    * 32×32 方框、躯干按 40 逻辑单位宽挂载，各缩各的，头相对身体既偏窄又对不上。 */
   left: number; right: number;
 }
-export type PartImages = Partial<Record<PartName, PartImage>>;
+/**
+ * 纸偶件那一套：整人一张画、在关节处切开来的部件。
+ *
+ * 与老的那套并存：老的是"头 + 躯干是画的、四肢是程序化圆柱"，两种画法并排，
+ * 接口永远对不齐；纸偶件是同一张画切出来的，接缝与颜色天然成立。
+ */
+export type DollParts = Partial<Record<PartName, PartImage>>;
+
+export type PartImages = Partial<Record<PartName, PartImage>> & {
+  /**
+   * 纸偶件。用 ?doll=1 打开，两套并存便于 A/B 对比（见 renderer 的 drawDollLimbs）。
+   */
+  doll?: DollParts;
+};
+
+/** 纸偶件那一套的部件名（与老的那套几乎不重叠，但头/躯干是同名的） */
+export const DOLL_NAMES: PartName[] = [
+  'head', 'torso', 'armFU', 'armFL', 'handF', 'legFU', 'legFL', 'footF',
+];
+
+/**
+ * 纸偶模式开关：`?doll=1`，或用 setDollMode 显式打开（测试与探针用）。
+ *
+ * 为什么做成开关而不是直接换掉：
+ *  · 两套必须能同屏比一次（同一帧、同一姿势，只有画法不同），否则"新管线更好"
+ *    只能靠记忆里的印象来判断；
+ *  · 平时不探纸偶件——十二个人里没换的人不探这 8 个文件，就是 60 多个必然 404
+ *    （选人页把十二个人全预载一遍，那在手机上是真的往返延迟）。
+ */
+let dollOverride: boolean | null = null;
+export function setDollMode(v: boolean | null): void { dollOverride = v; }
+export function dollModeOn(): boolean {
+  if (dollOverride !== null) return dollOverride;
+  if (typeof location === 'undefined') return false;
+  return /[?&]doll=1/.test(location.search);
+}
 
 /** **实际去探测的部件**。类型 PartName 仍列着七件（挂载逻辑逐件独立，随时能接上），
  * 但只探这两件——美术管线在 docs/art-pipeline.md 第 0 节就定了「只做头 + 躯干，不做四肢」，
  * 每角色出图量 6 张降到 2 张，那四肢与兵器的图**从来没有生产过、以后也不打算生产**。
  * 照七件探的代价是每个角色 5 个必然 404：选人页把十二个人全预载一遍，就是 60 个白跑的请求
  * （生产构建实测 63 个失败请求，其中 60 个是这个）。手机上那是实打实的往返延迟。
- * 哪天真出了四肢素材，把名字加回这张表即可——扩展点还在，只是不再为它每次白付 60 个请求。 */
-const NAMES: PartName[] = ['head', 'torso'];
+ * 哪天真出了四肢素材，把名字加回这张表即可——扩展点还在，只是不再为它每次白付 60 个请求。
+ *
+ * 2026-10-23：**纸偶件**（整人一张画切出来的上臂/前臂/手/大腿/小腿/脚）另有一套探测表
+ * （DOLL_NAMES），走 chars/<id>/parts/<部件名>.png，**只在 ?doll=1 时探**。
+ * 为什么不并进这张表：这六件只有换成了纸偶的角色才有，逐个角色去探就是必然 404——
+ * 十二个人里换了几个人就白付几倍 8 个请求。分开探，A/B 时打开开关即可。
+ * 远侧（背向镜头的那条）复用近侧的图，不再单独切一套。 */
+const NAMES: PartName[] = [
+  'head', 'torso',
+];
 
 function loadImg(src: string): Promise<HTMLImageElement | null> {
   return new Promise(res => {
@@ -109,5 +158,16 @@ export async function loadParts(charId: string): Promise<PartImages> {
     const img = imgs[i];
     if (img) { const { top, bottom, left, right } = verticalBounds(img); out[n] = { img, top, bottom, left, right }; }
   });
+  // 纸偶件：整人一张画切出来的那一套。只在 ?doll=1 时探测——
+  // 平时不付这 8 个请求（旧管线用不上它们）。
+  if (dollModeOn()) {
+    const dimgs = await Promise.all(DOLL_NAMES.map(n => loadImg(`${import.meta.env.BASE_URL}chars/${charId}/parts/${n}.png`)));
+    const doll: DollParts = {};
+    DOLL_NAMES.forEach((n, i) => {
+      const img = dimgs[i];
+      if (img) { const { top, bottom, left, right } = verticalBounds(img); doll[n] = { img, top, bottom, left, right }; }
+    });
+    if (Object.keys(doll).length) out.doll = doll;
+  }
   return out;
 }

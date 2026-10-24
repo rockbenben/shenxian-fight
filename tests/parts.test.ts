@@ -1,5 +1,5 @@
 import { afterEach, expect, test } from 'vitest';
-import { loadParts, trimVertical } from '../src/render/parts';
+import { loadParts, setDollMode, trimVertical } from '../src/render/parts';
 
 // 测试环境是 vitest 默认的 node，没有浏览器 Image——用一个假 Image 桩子顶替 globalThis.Image。
 // src 里 loadImg() 只在被调用时才 new Image()，不在 import 时，所以在每个 test 内部按需替换
@@ -37,18 +37,44 @@ test('只有 head 时其余回退：head 字段就位，torso 不存在', async 
 // 探测列表从七件收到两件（head/torso）之后，原来那几条 `expect(parts.armF).toBeUndefined()`
 // **永远不可能失败**——那些字段再没有任何实现会去设它。换成守真正的新行为：
 // 只为 NAMES 里的名字发请求，一个多余的都不发（那 60 个必然 404 就是这么来的）。
-test('只探 head/torso 两件，不为四肢与兵器发请求', async () => {
-  allow = new Set(['head', 'torso']);
+//
+// 2026-10-23：加了**纸偶件**（整人一张画切出来的上臂/前臂/手/大腿/小腿/脚）。
+// 这六件是成套的：换成纸偶的角色六件齐全，所以探它们不会产生必然 404；
+// 老的 armF/armB/legF/legB/weapon 仍然不探（管线不生产它们）。
+test('默认只探 head/torso，纸偶件不探（没换的人不为它们白付 404）', async () => {
+  allow = new Set(['head', 'torso', 'armFU', 'armFL', 'handF', 'legFU', 'legFL', 'footF']);
   requested = [];
   globalThis.Image = FakeImage as unknown as typeof Image;
 
   await loadParts('testchar');
 
-  const names = requested.map(u => u.split('/').pop());
-  expect(names.sort(), '探测的部件名与 NAMES 对不上').toEqual(['head.png', 'torso.png']);
+  const names = requested.map(u => u.split('/').pop()).sort();
+  expect(names, '探测的部件名与 NAMES 对不上').toEqual(['head.png', 'torso.png']);
   for (const gone of ['armF', 'armB', 'legF', 'legB', 'weapon']) {
     expect(requested.some(u => u.endsWith(`/${gone}.png`)),
       `又在探测 ${gone}.png——那是管线明确不生产的部件，每个角色白付一个 404`).toBe(false);
+  }
+});
+
+test('打开纸偶模式才探 parts/ 下那一套，且路径带 parts/ 这一层', async () => {
+  allow = new Set(['head', 'torso', 'armFU', 'armFL', 'handF', 'legFU', 'legFL', 'footF']);
+  requested = [];
+  globalThis.Image = FakeImage as unknown as typeof Image;
+  setDollMode(true);
+  try {
+    const parts = await loadParts('testchar');
+    expect(parts.doll, '纸偶件没装进来').toBeTruthy();
+    expect(parts.doll?.armFU, '纸偶的上臂没装进来').toBeTruthy();
+    for (const n of ['armFU', 'armFL', 'handF', 'legFU', 'legFL', 'footF']) {
+      expect(requested.some(u => u.endsWith(`/parts/${n}.png`)),
+        `纸偶模式开着却没探 parts/${n}.png`).toBe(true);
+    }
+    for (const gone of ['armF', 'armB', 'legF', 'legB', 'weapon']) {
+      expect(requested.some(u => u.endsWith(`/${gone}.png`)),
+        `又在探测 ${gone}.png——那是管线明确不生产的部件，每个角色白付一个 404`).toBe(false);
+    }
+  } finally {
+    setDollMode(null);
   }
 });
 

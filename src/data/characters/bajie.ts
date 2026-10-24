@@ -56,6 +56,14 @@ export const BAJIE: CharacterDef = {
   id: 'bajie', name: '猪八戒', hp: 210, speed: 4.2, jumpVel: 14,
   width: 62, height: 148,
   palette: { main: '#7a5a3a', accent: '#e8c98a' },
+  // 体型：四肢粗细 / 手形 / 装束。肥硕：全场最厚的掌，僧袍的袖口。
+  // 此前十二个人共用同一套四肢几何（同样粗、同样一颗圆手），只有颜色不同——
+  // 于是十二个人看着像同一副假人换了个色。
+  // 头身比：内容框 103×123、脸 91×70（源像素，量的——工具见 scripts/measure-heads.py）——
+  // 整颗头几乎就是脸（猪头，两只大耳朵也占在框里）。
+  // 归一只用一条锚（内容盒高 = 头高），脸只管挂点与接缝；0.92 是特质倍率：
+  // 他是十二人里身子最肥的，头小才读得出是「一头猪撞在肉山上」，头大了就成了穿西装的猪。
+  build: { rig: { k: 0.22, chinY: 112.4, shoulderY: 109.3, hipY: 18.26, shoulderDx: -25.11, backShoulderDx: 23.57, headDx: -2.185, legFDx: 9.929, legBDx: -12.51, footAnchorX: 0.3518, face: [33, 61, 182, 118], upperArm: 29.26, lowerArm: 18.48, handLen: 18.48, thigh: 1.76, shin: 1.76, torsoLen: 94.16 }, shoulderDx: -17.1, shoulderDy: 2.7, arm: 1.45, leg: 1.35, hand: 'paw', sleeve: 'cuff', face: [12, 37, 91, 70], head: 0.92 },
   weapon: { kind: 'rake', len: 100, grip: 0.44, shaft: '#5a4028', edge: '#9aa0a6' }, // 九齿钉耙
   adorn: {
     sashes: [

@@ -1,0 +1,103 @@
+{
+  "style": "Flat vector illustration, thick dark outline, cel shaded, Chinese mythology character. East Asian face. Flat blocks of solid color with hard edges — no soft gradients, no airbrush shading, no fine cross-hatching, not semi-realistic. Plain flat solid magenta #FF00FF background. Absolutely no text, no letters, no words, no captions, no watermark, no signature anywhere in the image.",
+  "contracts": {
+    "head": " A single head, one view only — one subject alone in the picture, not a character sheet, no multiple views, no side-by-side panels, no duplicates. The picture shows the head and a short stub of the neck, and nothing else. The neck stub is cut off cleanly just below the jaw, narrowing as it goes down and fading out at the very bottom edge of the picture. No shoulders, no chest, no collar, no garment, no armour — nothing below the neck. The head stays upright with the chin level — do not tilt or rotate the picture. It is turned horizontally about 35 degrees to its right, pivoting around the vertical axis of the neck: the nose breaks the line of the far cheek, the far cheek is partly hidden behind it, the near ear is fully visible and the far ear is hidden. Not a frontal portrait facing the camera, and not a flat 90-degree side profile. The head fills the frame: the top of the hair or hat is close to the top edge, the neck stub reaches close to the bottom edge, only a thin margin all around. Any long ribbon, plume, hair tail or hat wing stays inside the picture, trailing down behind the head — it may not spread out to the sides and it may not leave the frame. The eyes, the nose and the mouth are fully visible: hair, headwear and beard frame the face but never cover the eyes or the bridge of the nose. The stated palette applies to the hair, headwear and ornaments only — the face keeps a natural warm skin tone, unless the character is explicitly described as having a non-human face colour.",
+    "torso": " A single upper body of one character, one view only, one subject alone in the picture. The picture shows the upper body from the top of the shoulders down to the waist; the shoulders touch the top edge of the picture and the waist touches the bottom edge, so the body fills the whole frame. The body is turned about 35 degrees so that the chest and the belly face the RIGHT of the picture and the back is at the LEFT. The garment is sleeveless: at the top LEFT, the shoulder nearest the viewer is a small rounded cap of bare skin and the sleeve ends right there, so a bare arm could be attached to it; the sleeve is not drawn any further down. The neck opening is at the top centre. The silhouette is clearly taller than wide but still broad, about 3 units wide for every 5 units tall. Nothing spreads out sideways — no outstretched sleeves, no sashes flying out, no spread wings. No head, no hair, no face, no legs, no feet. The stated palette applies to the garment and its trim; the bare shoulder cap and the neck stump keep a natural warm tone, unless the character is explicitly described otherwise."
+  },
+  "heads": [
+    {
+      "id": "nezha",
+      "desc": "Head and neck only of Nezha, the Chinese boy deity of the lotus: a round boy's face, smooth and clean-shaven with NO beard and NO moustache, BLACK hair in two small round buns on top of the head, a red headband across the forehead, long red silk ribbons streaming down behind the head, red and gold palette."
+    },
+    {
+      "id": "wukong",
+      "desc": "Head and neck only of Sun Wukong, the Monkey King: a simian face with golden brow fur and a wide muzzle, a sharp yellow eye, a gold circlet over the brow, gold and ochre palette. The golden fur frames the muzzle like an animal's ruff — it is not a human beard."
+    },
+    {
+      "id": "erlang",
+      "desc": "Head and neck only of Erlang Shen, the Chinese sky god: a stern divine face, clean-shaven with no beard and no moustache, a third eye on the forehead, a tall silver crown, blue and silver palette."
+    },
+    {
+      "id": "niumo",
+      "desc": "Head and neck only of Niu Mo Wang, the Bull Demon King: a broad bovine face with heavy brows and a wide muzzle, a thick black mane and a full black beard, two great curved black horns, dark brown and gold palette."
+    },
+    {
+      "id": "honghaier",
+      "desc": "Head and neck only of Red Boy, a Chinese boy demon deity: a round boy's face, smooth and clean-shaven with NO beard and NO moustache, wild flame-red hair standing straight up like fire and swept back away from the face, not hanging down in front of the chin, a fierce toothy grin, crimson and gold palette."
+    },
+    {
+      "id": "tieshan",
+      "desc": "Head and neck only of Princess Iron Fan, a Chinese noblewoman deity: high coiled hair with a single jade hairpin, a composed dignified full round face, clean-shaven with no beard and no moustache, teal and white palette."
+    },
+    {
+      "id": "baigu",
+      "desc": "Head and neck only of the White Bone Lady, a Chinese ghost spirit in opera style: a pale white painted face, clean-shaven with no beard and no moustache, dark shadowed eyes, an ornate white opera headdress, bone-white and grey-green palette."
+    },
+    {
+      "id": "houyi",
+      "desc": "Head and neck only of Hou Yi the archer, a Chinese hunter deity: a cloth headband across the brow, a weathered determined face with a full dark beard, ochre and amber palette."
+    },
+    {
+      "id": "leizhen",
+      "desc": "Head and neck only of Lei Zhenzi, a Chinese thunder deity: a blue-green face with a sharp beak-like nose, clean-shaven with no beard and no moustache, lightning motif on the brow, thunder-blue and moon-white palette."
+    },
+    {
+      "id": "zhongkui",
+      "desc": "Head and neck only of a Chinese opera magistrate character: a dignified stern face above a full curly black beard, a black winged futou official hat, deep purple and vermilion palette."
+    },
+    {
+      "id": "bajie",
+      "desc": "Head and neck only of Zhu Bajie, a Chinese pig-headed monk deity: a boar snout and large floppy ears, a friendly round pig face, smooth and clean-shaven with NO beard and NO moustache, a brown monk's cap, earth-brown and cream palette."
+    }
+  ],
+  "torsos": [
+    {
+      "id": "nezha",
+      "desc": "A small slim boy's upper body in a sleeveless crimson belly-band tunic with gold cloud trim and a red sash at the waist, red and gold palette."
+    },
+    {
+      "id": "wukong",
+      "desc": "A wiry athletic upper body in a sleeveless ochre monkey-warrior vest with gold trim and a tiger-stripe sash at the waist, gold and ochre palette."
+    },
+    {
+      "id": "erlang",
+      "desc": "A broad-shouldered upper body in a sleeveless deep-blue heavenly general tunic with silver cloud trim and a jade belt plaque, blue and silver palette."
+    },
+    {
+      "id": "niumo",
+      "desc": "A massive barrel-chested upper body in a sleeveless dark-brown hide tunic with bronze studs and a heavy belt, dark brown and gold palette."
+    },
+    {
+      "id": "honghaier",
+      "desc": "A small boy's upper body in a sleeveless crimson tunic with gold cloud trim and a red sash, crimson and gold palette."
+    },
+    {
+      "id": "tieshan",
+      "desc": "A slender upper body in a sleeveless teal bodice with white silk trim along the neckline only, teal and white palette."
+    },
+    {
+      "id": "baigu",
+      "desc": "A broad-shouldered upper body in a sleeveless pale ivory layered vestment with a grey-green silk sash at the waist, bone-white and grey-green palette."
+    },
+    {
+      "id": "houyi",
+      "desc": "A sturdy upper body in a sleeveless ochre hunter's short jacket with a leather chest strap and amber trim, ochre and amber palette."
+    },
+    {
+      "id": "leizhen",
+      "desc": "A lean upper body in a sleeveless thunder-blue tunic with moon-white feathered wing roots folded tight against the back, thunder-blue and moon-white palette."
+    },
+    {
+      "id": "zhongkui",
+      "desc": "A broad heavy-shouldered upper body in a sleeveless vermilion official vestment with a dark purple sash and a jade belt plaque, deep purple and vermilion palette."
+    },
+    {
+      "id": "bajie",
+      "desc": "A big round-bellied upper body in a sleeveless earth-brown monk's kasaya with a cream sash, earth-brown and cream palette."
+    },
+    {
+      "id": "xingtian",
+      "desc": "A broad-shouldered russet and antique bronze armoured upper body with a wide empty neck socket at the top centre, a pair of fierce glaring eyes set into the chest plate and a wide fanged mouth set into the belly plate — small features on the armour plates, not a face. Russet and antique bronze palette."
+    }
+  ]
+}

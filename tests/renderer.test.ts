@@ -1,7 +1,7 @@
 import { expect, test } from 'vitest';
 import {
   capturePrev, draw, drawBg, drawBoneImg, extendSeg, headAnchor, torsoAnchors, blockArcGeom,
-  NECK_OVERLAP, WAIST_OVERLAP, TORSO_MOUNT_HALFW, THIGH_LEN, THIGH_W, TAPER,
+  NECK_OVERLAP, WAIST_OVERLAP, TORSO_MOUNT_HALFW, THIGH_LEN, LIMB_R,
 } from '../src/render/renderer';
 import { LOGIC_H, LOGIC_W, NULL_INPUT } from '../src/engine/types';
 import { DEFAULT_BG } from '../src/data/stages';
@@ -366,7 +366,8 @@ function legCapsuleMargin(p: [number, number], hipX: number, hipY: number, legAn
   const relx = p[0] - hipX, rely = p[1] - hipY;
   const s = relx * dirx + rely * diry; // 沿大腿方向的投影
   const t = relx * ex + rely * ey;      // 垂直于大腿方向的投影
-  const r1 = THIGH_W / 2, r2 = (THIGH_W * TAPER) / 2;
+  // 半径取自渲染层导出的 LIMB_R，不在测试里另抄一份（抄的那份一定会漂）
+  const r1 = LIMB_R.thigh[0], r2 = LIMB_R.thigh[1];
   const discMargin = r1 - Math.hypot(relx, rely); // 髋端圆头帽：与朝向无关的兜底覆盖
   const rAtS = s <= 0 ? r1 : s >= THIGH_LEN ? r2 : r1 + (r2 - r1) * (s / THIGH_LEN);
   const bodyOk = s >= -1e-6 && s <= THIGH_LEN + 1e-6;

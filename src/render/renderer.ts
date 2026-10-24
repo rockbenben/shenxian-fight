@@ -1,6 +1,6 @@
 import { DESPERATE_HP, FLOOR_Y, LOGIC_H, LOGIC_W } from '../engine/types';
 import type { Battle } from '../engine/battle';
-import type { CharacterDef, Fighter, Move, WeaponDef } from '../engine/types';
+import type { CharacterDef, CharacterRig, Fighter, Move, WeaponDef } from '../engine/types';
 import { worldBox } from '../engine/collision';
 import { drawAdornments, drawDecals, drawFlung, drawWings, isDisarmed } from './adornments';
 import { skeletalSource, type PoseSource, type SkelDoc } from './poseSource';
@@ -15,7 +15,9 @@ import { MOTIONS } from '../data/motions';
 import { samplePose, lerpPose } from './motion';
 import type { Pose } from './motion';
 import { DEFAULT_BG, type StageBg } from '../data/stages';
-import { loadParts, type PartImage, type PartImages } from './parts';
+import { loadParts, type DollParts, type PartImage, type PartImages } from './parts';
+import { applyBloom, applyVignette } from './post';
+import { drawStageMatte, getStageArt } from './stageArt';
 import { INK } from './palette';
 
 // 部件图缓存：'pending' = 加载中（防止 60fps 重复发起探测请求），PartImages = 已探测完成
@@ -55,6 +57,12 @@ function getParts(id: string): PartImages | null {
 }
 
 export interface PrevPos { x1: number; y1: number; x2: number; y2: number }
+
+/**
+ * 本帧的光源颜色（关卡的天体色）。角色身上要掺一点它——背景与角色被同一盏光照，
+ * 人才算站在景里而不是贴在景上。每帧开头由 draw() 设定一次（见 draw 里的 sceneLight = ...）。
+ */
+let sceneLight = '#EDE3D2';
 
 const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
 
@@ -126,12 +134,16 @@ function drawCelestial(ctx: CanvasRenderingContext2D, bg: StageBg) {
   }
   ctx.fillStyle = bg.celestialColor;
   ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.fill();
-  if (bg.celestial === 'crescent') { // 挖掉一个偏心圆，啃出月牙；save/restore 包住合成模式，
-    // 而非手动复位——中间万一被人加个 early return，手动复位那行会被跳过，合成模式漏出去
-    ctx.save();
-    ctx.globalCompositeOperation = 'destination-out';
-    ctx.beginPath(); ctx.arc(cx + r * 0.55, cy - r * 0.25, r * 0.9, 0, Math.PI * 2); ctx.fill();
-    ctx.restore();
+  if (bg.celestial === 'crescent') {
+    // 月牙：外圆 + 偏心内圆**反向**描一遍，nonzero 填充规则自然把重叠处挖空。
+    //
+    // 原来用的是 'destination-out' 挖——那是在**画布上真的挖了个洞**，露出来的是页面底色
+    // （#0E141C 的深藏青），不是天色。夜里天暗，看不出来；翠云山那种青天上一眼就是
+    // 一个月亮旁边挂了颗黑球。画成路径就没有洞，天色原样留在月牙缺掉的地方。
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, Math.PI * 2, false);
+    ctx.arc(cx + r * 0.55, cy - r * 0.25, r * 0.9, 0, Math.PI * 2, true);
+    ctx.fill();
   }
 }
 
@@ -173,14 +185,13 @@ function drawClouds(ctx: CanvasRenderingContext2D, bg: StageBg, camX: number, vi
   }
 }
 
-/** 剪影山形：seed 正弦叠加。far/near 两层复用同一形状函数，靠 seed 偏移和振幅/频率区分，不同形。
- * x0/x1 是本次要画满的可见逻辑 x 范围（默认 0..LOGIC_W，宽屏时由调用方传更宽的范围）——山形
- * 曲线本身的算法（wx 的推导）不变，只是多算几段延伸到新边界 */
-function drawSilhouette(
-  ctx: CanvasRenderingContext2D, color: string, seed: number, camX: number, parallax: number,
+/** 剪影山形的路径。单独抽出来是因为轮廓光要画两遍（见 drawSilhouette）：
+ * 先把整条脊线往上挪一点点、用光色填一遍，再用本色填回原位——
+ * 挪出来的那条窄边就是迎着天光的那道边。 */
+function silhouettePath(
+  ctx: CanvasRenderingContext2D, seed: number, camX: number, parallax: number,
   baseH: number, amp1: number, amp2: number, xFreq: number, wxMul2: number, x0: number, x1: number,
 ) {
-  ctx.fillStyle = color;
   ctx.beginPath();
   ctx.moveTo(x0, FLOOR_Y);
   for (let x = x0; x <= x1; x += 16) {
@@ -190,21 +201,96 @@ function drawSilhouette(
   }
   ctx.lineTo(x1, FLOOR_Y);
   ctx.closePath();
+}
+
+/** 剪影山形：seed 正弦叠加。far/near 两层复用同一形状函数，靠 seed 偏移和振幅/频率区分，不同形。
+ * x0/x1 是本次要画满的可见逻辑 x 范围（默认 0..LOGIC_W，宽屏时由调用方传更宽的范围）——山形
+ * 曲线本身的算法（wx 的推导）不变，只是多算几段延伸到新边界。
+ *
+ * rim：轮廓光。迎着天光的那条脊线给一道亮边——剪影没有内部明暗，全靠这道边把"山"从
+ * 天空里分出来。做法是把同一条路径往上挪 2px 用光色填一遍、再用本色填回原位。 */
+function drawSilhouette(
+  ctx: CanvasRenderingContext2D, color: string, seed: number, camX: number, parallax: number,
+  baseH: number, amp1: number, amp2: number, xFreq: number, wxMul2: number, x0: number, x1: number,
+  opts?: { rim?: { color: string; px: number }; volume?: [number, number] },
+) {
+  const rim = opts?.rim;
+  if (rim) {
+    ctx.save();
+    ctx.translate(0, -rim.px);
+    silhouettePath(ctx, seed, camX, parallax, baseH, amp1, amp2, xFreq, wxMul2, x0, x1);
+    ctx.fillStyle = rim.color;
+    ctx.fill();
+    ctx.restore();
+  }
+  silhouettePath(ctx, seed, camX, parallax, baseH, amp1, amp2, xFreq, wxMul2, x0, x1);
+  if (opts?.volume) {
+    // 体积：山体上缘略亮、往下压暗。一整块平涂的深色在夜里读成"一条黑带"，
+    // 有了这个渐变才读成"一座山"——明暗全靠这道竖向的坡
+    const [top, bottom] = opts.volume;
+    const g = ctx.createLinearGradient(0, FLOOR_Y - baseH - amp1, 0, FLOOR_Y);
+    g.addColorStop(0, shade(color, top));
+    g.addColorStop(1, shade(color, bottom));
+    ctx.fillStyle = g;
+  } else {
+    ctx.fillStyle = color;
+  }
   ctx.fill();
 }
 
-// 背景四层，由远及近：渐变天空 → 天体（不参与视差）→ 如意云纹（0.15x）→ 远山剪影（0.3x，已有）
-// → 近景剪影（0.6x，新增）。整体画在 cam.apply 之前的屏幕空间，不随相机缩放/抖动；视差靠 camX
-// 手动加权算偏移，而非交给画布变换（若挪到 cam.apply 之后，相机的整体平移+缩放会再叠加一层，
-// 视差就会双重生效或错位）。visW/visH 默认等于 LOGIC_W/LOGIC_H（不传时行为与改动前完全一致），
-// 宽于/高于安全区时由调用方（draw()）传实际可见的逻辑尺寸，背景铺满整块画布，不再露出页面底色。
-// 天体（drawCelestial）不是按 seed 派生位置，本来就没有"绘制范围"要跟着变宽——固定挂在安全区
-// 右上角，跟这次改动无关，不动它
+/**
+ * 层与层之间的大气：远层画完之后压一道近地平线的雾。
+ *
+ * 没有这一层的时候，三层剪影是三个同样黑的黑块贴在一起——深度只能靠"谁更黑"来读，
+ * 而夜里越远的东西并不更黑，是**更被雾吃掉**。这层雾就是让远山退进天色里的那一步。
+ */
+function drawHaze(
+  ctx: CanvasRenderingContext2D, color: string, offX: number, topY: number, visW: number, alpha: number,
+) {
+  if (alpha <= 0) return;
+  const g = ctx.createLinearGradient(0, FLOOR_Y, 0, topY);
+  g.addColorStop(0, hexAlpha(color, alpha));
+  g.addColorStop(1, hexAlpha(color, 0));
+  ctx.fillStyle = g;
+  ctx.fillRect(-offX, topY, visW, FLOOR_Y - topY + 2);
+}
+
+/** 背景四层，由远及近：渐变天空 → 天体（不参与视差）→ 如意云纹（0.15x）→ 远山剪影（0.3x，已有）
+ * → 近景剪影（0.6x，新增）。整体画在 cam.apply 之前的屏幕空间，不随相机缩放/抖动；视差靠 camX
+ * 手动加权算偏移，而非交给画布变换（若挪到 cam.apply 之后，相机的整体平移+缩放会再叠加一层，
+ * 视差就会双重生效或错位）。visW/visH 默认等于 LOGIC_W/LOGIC_H（不传时行为与改动前完全一致），
+ * 宽于/高于安全区时由调用方（draw()）传实际可见的逻辑尺寸，背景铺满整块画布，不再露出页面底色。
+ * 天体（drawCelestial）不是按 seed 派生位置，本来就没有"绘制范围"要跟着变宽——固定挂在安全区
+ * 右上角，跟这次改动无关，不动它
+ *
+ * 关卡远景美术（public/stages/<id>/far.webp）存在时，far 层由那张画顶替：
+ * 画出来的远山比程序化剪影有细节得多，而程序化的近/中两层继续留在前面压着它，景深照旧。
+ * 没有那张画时，far 层照旧是剪影——逐层独立，缺哪层补哪层。 */
 export function drawBg(ctx: CanvasRenderingContext2D, bg: StageBg, camX: number, visW = LOGIC_W, visH = LOGIC_H) {
   const offX = (visW - LOGIC_W) / 2, offY = (visH - LOGIC_H) / 2;
+  const art = bg.id ? getStageArt(bg.id) : null;
+  const farArt = art?.far ?? null;
+
+  if (farArt) {
+    // **整幅背板**：画是唯一的背景来源——它自己的天空、自己的远山、自己的地面都在里面。
+    // 舞台自己的渐变天、云纹、山形剪影全部退场（一份背景只留一个来源，
+    // 两份天空叠在一起反而脏，而山影压在画上会把画压成"一条带"）。
+    // 星辰与月亮画在画**上面**：它们是天空里的东西，画的天是实的，正好接住。
+    // 视差 0.01：背板几乎不动。画出来的远景自带纵深，整幅一起飘反而像"背景在滑动"；
+    // 而背板一动就得重采样，细边缘会跟着抖——这一层只留一点点生气（镜头横移几百像素
+    // 才挪动 1px，而且对齐到整数像素，不产生重采样抖动）。
+    drawStageMatte(ctx, farArt, camX, 0.01, visW, visH, offX, offY);
+    drawStars(ctx, bg, camX, visW, offX, offY);
+    drawCelestial(ctx, bg);
+    drawAmbient(ctx, bg, camX, visW, visH, offX, offY);
+    return;
+  }
+
   const g = ctx.createLinearGradient(0, 0, 0, FLOOR_Y);
   g.addColorStop(0, bg.sky[0]);
-  g.addColorStop(1, bg.sky[1]);
+  g.addColorStop(0.58, bg.sky[1]);
+  // 近地平线的一层地气：天色到底下要往地的颜色里走一段，否则天地之间是一道硬边
+  g.addColorStop(1, mixC(bg.sky[1], bg.ground, 0.5));
   ctx.fillStyle = g;
   // 天空铺满整块画布高度（下沿到 LOGIC_H + offY，即 visH），不是只铺到 FLOOR_Y——地面紧接着
   // 在 cam.apply 之内按世界坐标画，zoom>1 时地面在屏幕上的起始 y 会低于 FLOOR_Y（贴近镜头
@@ -216,12 +302,19 @@ export function drawBg(ctx: CanvasRenderingContext2D, bg: StageBg, camX: number,
   drawStars(ctx, bg, camX, visW, offX, offY);
   drawCelestial(ctx, bg);
   drawClouds(ctx, bg, camX, visW, offX);
-  drawSilhouette(ctx, bg.silhouette, bg.seed, camX, 0.3, 90, 45, 25, 0.008, 2.7, -offX, LOGIC_W + offX);
-  drawSilhouette(ctx, shade(bg.silhouette, -18), bg.seed * 7 + 13, camX, 0.6, 150, 70, 30, 0.005, 1.8, -offX, LOGIC_W + offX);
+  // 远层：程序化的剪影。轮廓光用天色提亮一档——山脊迎着的那点光
+  drawSilhouette(ctx, bg.silhouette, bg.seed, camX, 0.3, 90, 45, 25, 0.008, 2.7, -offX, LOGIC_W + offX,
+    { rim: { color: mixC(bg.sky[1], INK.paper, 0.22), px: 2 }, volume: [10, -8] });
+  // 远层之后的雾：远山因此退进天色里
+  drawHaze(ctx, bg.sky[1], offX, FLOOR_Y - 210, visW, 0.34);
+  drawSilhouette(ctx, shade(bg.silhouette, -18), bg.seed * 7 + 13, camX, 0.6, 150, 70, 30, 0.005, 1.8, -offX, LOGIC_W + offX,
+    { rim: { color: mixC(bg.sky[1], INK.paper, 0.14), px: 2 }, volume: [8, -10] });
   drawAmbient(ctx, bg, camX, visW, visH, offX, offY);
   // 前景剪影：比角色更靠近镜头、跟随最快（1.15×），从画面下缘探进来。
-  // 这一层是"景深"的关键——此前所有层都在角色之后，画面是平的
-  drawSilhouette(ctx, shade(bg.silhouette, -34), bg.seed * 13 + 5, camX, 1.15, 250, 34, 26, 0.006, 1.1, -offX, LOGIC_W + offX);
+  // 这一层是"景深"的关键——此前所有层都在角色之后，画面是平的。
+  // 振幅压平（34/26 → 18/12）：它是岸，不该读成一道浪。
+  drawSilhouette(ctx, shade(bg.silhouette, -34), bg.seed * 13 + 5, camX, 1.15, 250, 18, 12, 0.006, 1.1, -offX, LOGIC_W + offX,
+    { rim: { color: mixC(bg.sky[1], INK.paper, 0.1), px: 2 }, volume: [6, -6] });
 }
 
 /** 星野：只在夜色足够深的关卡出现（按天空上缘亮度判定），位置由下标的固定散列给出，
@@ -321,6 +414,7 @@ let ambientPhase = 0;
  * 屏幕比例算出更大的值传进来。draw() 不传这个参数时行为与改动前逐像素一致。 */
 export interface Viewport { w: number; h: number }
 
+
 export function draw(
   ctx: CanvasRenderingContext2D, b: Battle, prev: PrevPos, alpha: number,
   cam: Camera, fx: FxSystem, banner: BannerSystem, mandorla: MandorlaSystem,
@@ -329,12 +423,31 @@ export function draw(
 ) {
   const offX = (viewport.w - LOGIC_W) / 2, offY = (viewport.h - LOGIC_H) / 2;
   drawBg(ctx, bg, cam.x, viewport.w, viewport.h);
+  // 这一帧的光源颜色。角色要受同一盏光的照（见 drawFighter 里的 sceneLight 混色），
+  // 所以它在每帧开头定一次，不各处现取——两处现取就会在换关的那一帧取到不同的值
+  sceneLight = bg.celestialColor;
   cam.apply(ctx);
-  ctx.fillStyle = bg.ground;
-  ctx.fillRect(-LOGIC_W - offX, FLOOR_Y, LOGIC_W * 3 + offX * 2, LOGIC_H - FLOOR_Y + offY);
+  // 地面：近地平线一层被雾照亮的地气，往镜头方向压暗。夜里远处的地被雾照着，近处是黑的——
+  // 之前是一整块平涂色，地面读起来像一张贴上去的色纸
+  const gg = ctx.createLinearGradient(0, FLOOR_Y, 0, LOGIC_H + offY);
+  gg.addColorStop(0, mixC(bg.ground, bg.sky[1], 0.32));
+  gg.addColorStop(0.28, bg.ground);
+  gg.addColorStop(1, shade(bg.ground, -12));
+  ctx.fillStyle = gg;
+  // 地面要一直铺到屏幕底边**以下**。镜头缩放时（放大招 1.25~1.45）地面线在屏幕上的位置
+  // 会往下走，而视口底边是固定的——按固定高度铺会露一条底（画在背景层，就成了"画从地板下
+  // 冒出来"）。这里按当前缩放把地面线的世界坐标反算出来，铺到它以下为止。
+  const zoom = Math.max(0.3, cam.zoom);
+  const worldBottom = 300 + ((-offY + viewport.h) - 300) / zoom;
+  const groundH = Math.max(LOGIC_H - FLOOR_Y + offY, worldBottom - FLOOR_Y + 20);
+  ctx.fillRect(-LOGIC_W - offX, FLOOR_Y, LOGIC_W * 3 + offX * 2, groundH);
   ctx.strokeStyle = INK.ink;
   ctx.lineWidth = 2;
   ctx.beginPath(); ctx.moveTo(-LOGIC_W - offX, FLOOR_Y); ctx.lineTo(LOGIC_W * 2 + offX, FLOOR_Y); ctx.stroke(); // 地平线
+  // 地平线下沿压一道极淡的亮线：天地之间那层空气。之前天地之间是一道硬边
+  ctx.strokeStyle = hexAlpha(mixC(bg.sky[1], INK.paper, 0.45), 0.28);
+  ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(-LOGIC_W - offX, FLOOR_Y + 2); ctx.lineTo(LOGIC_W * 2 + offX, FLOOR_Y + 2); ctx.stroke();
   ctx.strokeStyle = hexAlpha(INK.paper, 0.06); // 极淡横向纹理带，不做倒影
   ctx.lineWidth = 1;
   for (let ty = FLOOR_Y + 16; ty < LOGIC_H; ty += 18) {
@@ -342,15 +455,21 @@ export function draw(
   }
   const p1x = lerp(prev.x1, b.p1.x, alpha), p1y = lerp(prev.y1, b.p1.y, alpha);
   const p2x = lerp(prev.x2, b.p2.x, alpha), p2y = lerp(prev.y2, b.p2.y, alpha);
+  // 背光先画：它是"角色身后的光"，要在角色的投影之下——否则光晕会把脚下的影子照淡，
+  // 影子一淡人就浮起来了
+  drawBacklight(ctx, p1x, FLOOR_Y - p1y, bg.celestialColor);
+  drawBacklight(ctx, p2x, FLOOR_Y - p2y, bg.celestialColor);
   drawShadow(ctx, p1x, p1y, b.p1.def.width);
   drawShadow(ctx, p2x, p2y, b.p2.def.width);
   drawDecals(ctx);                    // 地面痕迹：地面之上、角色之下
   drawAdornments(ctx, b, 'back');     // 飘带与满槽气环：在角色之下
   drawWeaponTrail(ctx, 0, b.p1.def); // 拖影压在角色之下：刃光该在身后拉出去，不该盖住人
   drawGhosts(ctx, ghostState.p1, b.p1.def); // 残影画在出招者之前（在其身后），只在 sp100 窗口内非空
+  drawGhosts(ctx, ghostState.t1, b.p1.def); // 普通招式的身形拖影，同理画在角色身后
   drawFighter(ctx, b.p1, p1x, p1y, 0);
   drawWeaponTrail(ctx, 1, b.p2.def);
   drawGhosts(ctx, ghostState.p2, b.p2.def);
+  drawGhosts(ctx, ghostState.t2, b.p2.def);
   drawFighter(ctx, b.p2, p2x, p2y, 1);
   if (dark > 0) {
     ctx.fillStyle = `rgba(6,4,16,${dark * 0.75})`;
@@ -367,6 +486,7 @@ export function draw(
       // 支重绘，让残影跟出招者一起穿过暗场
       mandorla.draw(ctx, px, FLOOR_Y - py - MANDORLA_Y, dark);
       drawGhosts(ctx, highlight === 0 ? ghostState.p1 : ghostState.p2, f.def);
+      drawGhosts(ctx, highlight === 0 ? ghostState.t1 : ghostState.t2, f.def);
       drawFighter(ctx, f, px, py, highlight); // 遮罩之上重画一次，让出招者保持明亮
     }
   }
@@ -389,6 +509,11 @@ export function draw(
   }
   cutin?.draw(ctx); // cut-in 立绘：在速度线之上、竖排招式名之下（名字必须始终可读）
   banner.drawScreen(ctx); // 大招竖排卷轴+印、关卡开场横幅：屏幕空间，不随镜头晃/缩放；须压在速度线之上
+  // 后期：辉光 + 暗角。位置在 HUD **之前**——血条、计时器是读数不是光源，烤亮了反而难读；
+  // 而大招的招式名、cut-in 立绘属于演出，值得跟着一起发光。
+  // 暗角同理：它压的是画面四角的底色，压在血条上会让两条血条的末端糊进黑里。
+  applyBloom(ctx);
+  applyVignette(ctx, offX, offY, viewport.w, viewport.h, 0.46);
   drawBars(ctx, b, viewport.w); // 血条不受相机影响；宽屏下贴真实屏幕边缘，不是贴 960 的边
   drawLetterbox(ctx, bars, viewport, offX, offY);
 }
@@ -532,8 +657,9 @@ function drawSpeedLines(ctx: CanvasRenderingContext2D, alpha: number, color: str
 
 // 骨骼尺寸（相对脚底）
 const SHOULDER_Y = 118, HIP_Y = 62;
-const UPPER_ARM = 26, LOWER_ARM = 26, THIGH = 32, SHIN = 32;
+export const UPPER_ARM = 26, LOWER_ARM = 26, THIGH = 32, SHIN = 32;
 export const THIGH_LEN = THIGH; // 导出给测试算腰部接缝用（腿部胶囊帽半径要用 THIGH_W/TAPER）
+export const SHIN_LEN = SHIN;   // 小腿段长：导出给测试复算"脚落在哪"（THIGH 与 SHIN 目前同为 32）
 export const THIGH_W = 13; // seg() 调用里大腿段的裸 13，命名导出防止测试抄错数
 
 /** motionSeq 段间接缝的姿势混合窗口（帧）。3–5 帧足够抹平切换瞬间的姿势跳变，不必长。 */
@@ -771,6 +897,56 @@ export function extendSeg(x: number, y: number, ex: number, ey: number, startExt
 
 export const TAPER = 0.55; // 关节端→末端的收分比例，水墨笔锋的锥度
 const TORSO_W = 38; // 躯干肩端宽度（直径）：明显大于头部直径 32，撑出宽肩窄腰的武人轮廓
+/**
+ * 四肢各段的半径（逻辑单位）。**相邻两段必须接上**：前一段的末端半径 = 后一段的起点半径。
+ *
+ * 不接上的话，关节处会有一级台阶——粗的一截突然从细的一截里冒出来，轮廓线上多一个折角。
+ * 那是"关节看起来不正常"最直接的一处（实测膝盖：大腿收细到 3.6，小腿从 5.5 起步，
+ * 左边缘跳一级，像接错的一节）。
+ *
+ * 数字的来历：肩 11 宽 → 肘 8 宽 → 腕 5 宽；髋 13 宽 → 膝 10 宽 → 踝 6 宽。
+ * 腕/踝那几像素正好让手与脚"长在"末端而不是"挂"在末端。
+ */
+export const LIMB_R = {
+  upperArm: [5.5, 4.0] as const,   // 肩 → 肘
+  foreArm: [4.0, 2.5] as const,     // 肘 → 腕
+  thigh: [6.5, 5.0] as const,       // 髋 → 膝
+  shin: [5.0, 3.0] as const,        // 膝 → 踝
+};
+/**
+ * 后侧手臂的横向偏移（逻辑单位，朝后）。**远侧手臂必须露出来**：
+ * 躯干宽 40，后臂宽 11，同根同向画就整根埋在躯干里——画面上就是"只有一只手"。
+ * 偏 17 之后，后臂从躯干的**后缘**探出来（肩那一端仍压在躯干后面），手与小臂露在体侧。
+ */
+/**
+ * 后侧（背向镜头的那条）手臂的横向偏移：往**画面右边**让开中轴。
+ *
+ * 画面右边是身体背向镜头的那一侧（见 NEAR_ARM_DX 的说明：头与躯干都是 3/4 侧身朝右，
+ * 近侧在画面左）。后臂画在躯干**之前**（被身体盖住），肩那一端藏进衣服里，
+ * 到腰（衣服收窄）才从背侧探出来——这才是 3/4 视角里后臂该有的样子。
+ * 原来它偏在 -17，也就是画面左、**近侧**那一头：后臂从近肩的位置探出来，
+ * 与近臂挤在同一侧，近臂反而横穿胸口——两侧都错了。
+ *
+ * 17 → 14：上臂肩端的半径是 5.5，偏 17 时那半截肩会探出衣服后缘 2.5 单位，
+ * 画面上就是背上一个圆包（十二个人都背着一个）。偏 14 时整条后臂藏在衣服里，
+ * 到腰才露出来。
+ */
+const FAR_ARM_DX = 14, FAR_ARM_DY = 2;
+/**
+ * 近侧（朝向镜头的那条）手臂的肩点：贴在身体的**近肩**上，横向让开身体中轴。
+ *
+ * 朝向是从素材量出来的，不是拍的：**头是统一的 3/4 侧脸朝右**（鼻尖朝画面右、
+ * 可见的耳朵在画面左），躯干十张的臂孔也都在画面左——画面左边就是身体朝向镜头的
+ * 那一侧（近侧），右边是背。
+ *
+ * 原来前臂的肩点钉在中轴（也就是脖子底下），于是这条手臂从下巴出发、斜穿整片胸口——
+ * 十二个人胸口上都横着一条淡色手臂，像一件贴上去的独立物件，而不是长在身上的一条胳膊
+ * （四肢是程序化的圆柱、躯干是画出来的 3/4 侧身衣服，两者接不接得住全看肩点落在哪）。
+ * 往后偏 12（torso 半宽 20 的六成）之后，手臂从衣服的**臂孔**里长出来，垂在体侧。
+ * 纵向取 -4：与颈点同高，肩关节藏在肩线（躯干贴图上缘，NECK_OVERLAP 之上那 8 单位）之下，
+ * 不会被画到肩线外面去。
+ */
+const NEAR_ARM_DX = 13.5, NEAR_ARM_DY = 4.5;   // 兜底值：实测十二人的中位数（量自躯干素材）
 // 贴图躯干挂载半宽（原来是 drawBoneImg 调用里的裸 20）。导出给测试用同一个数，不在
 // tests/renderer.test.ts 里另抄一份——抄一份的话渲染这边改了宽度，测试量的还是旧数字。
 export const TORSO_MOUNT_HALFW = 20;
@@ -805,27 +981,59 @@ const NECK_LEN = 4;
  * 看不出偏心；换成真脸就变成"头没长在脖子上"，是头身分离最直接的一项。收到 1。 */
 const CHIN_OFFSET = 1;
 /** 没有躯干贴图可参照时，头的目标高度（逻辑单位）——等于旧的 32×32 方框高度 */
-// 头贴图的目标高度（逻辑单位，颈点往上）。所有角色统一——骨架是同一副，
-// 头就该是同一个大小，角色差异体现在脸的画法、冠饰、发型上，不该体现在头有多大。
-// 取 36 是当前全员的均值，换过来不会整体变大或变小，只是把离散度收掉。
-// 头贴图的目标**尺度**（逻辑单位）：对齐的是内容盒的几何平均 sqrt(宽×高)，不是单边。
-// 33 取自全员当前均值，换过来整体不变大也不变小，只收离散度。
-const HEAD_TARGET = 33;
+// 头贴图的目标高度（逻辑单位，颈点往上）。骨架是同一副，头就该是同一个大小，
+// 角色差异体现在脸的画法、冠饰、发型上，不该体现在头有多大。
+// 40 对应头占身高 40/162 ≈ 24.7%——十二个人共用一副骨架，头一样大才说得通。
+const HEAD_TARGET = 40;
 
-/** 头贴图的像素→逻辑缩放：只看头素材自己的内容盒，按**面积**归一。
+/**
+ * 头贴图的像素→逻辑缩放：**内容盒高就是头高**。
  *
- * 按单边归一两头都不成立，实测过：
- *   按高：雷震子的头是 124x95 的宽扁形，高撑到 36 就横向铺到 47 逻辑单位，
- *         而铁扇公主 80x124 的高瘦头只有 23——脸宽差 2.04 倍。
- *   按宽：对称地把离散度挪回纵向。
- * 取 sqrt(宽×高) 之后全员落在 97.5~122.0，1.25 倍，两个方向都收得住，
- * 而且宽脸仍然宽、长脸仍然长——角色差异保留，只是"头有多大"这件事统一了。
+ * 新一版素材的契约是"头填满画幅"（scripts/head-art.json），实测十一个人的内容盒高
+ * 是 123~124 像素（几乎一样）——内容盒高因此就是头本身的高度。
+ * 于是归一只剩一条锚：把头缩到同一个逻辑高度，头占身高的比例就自然齐了
+ * （实测离散度 1.17，头高 38~47 的散布全部来自角色特质倍率）。
+ *
+ * 此前用"脸的几何平均"当尺子，是因为旧素材是**渐隐的半身像**——内容盒里肩胸占了一截，
+ * 盒高不等于头高，只能退而用脸去量。新素材不再需要那把尺子。
+ *
+ * 脸仍然要量，但只用于**两件事**：脸在整幅里的横向位置（挂点，见 headMountDx）
+ * 与下巴到整幅底边的那一段（脖子要伸多远才够到下巴，见 chinGapOf）。
  *
  * 导出给测试用同一条式子，不在测试里另抄一份。 */
 export function headScale(head: PartImage): number {
-  const w = Math.max(1, head.right - head.left);
-  const h = Math.max(1, head.bottom - head.top);
-  return HEAD_TARGET / Math.sqrt(w * h);
+  return HEAD_TARGET / Math.max(1, head.bottom - head.top);
+}
+
+/**
+ * 头在屏幕上的横向挂点：**按脸挂，不按整幅挂**。
+ *
+ * 头贴图是「脸 + 装饰」，而飘带、翎羽、帽翅这些装饰全都长在**左边**——
+ * 量出来的脸心比整幅中心偏右 6~31 像素（哪吒 23、悟空 28.5、白骨精 31.5）。
+ * 按整幅居中挂到颈点，脸就被推到身体中轴右边 2~10 像素：脖子接在**耳朵**那一侧，
+ * 头看着就「不在身体上」，头与双手也再不是一对。
+ *
+ * 改按脸心对齐颈点，装饰就甩到身侧去了（哪吒那条混天绫拖在身后，正该如此）。
+ * 返回的是整幅中心相对颈点的偏移（逻辑单位，正=脸在右边）。
+ */
+export function headMountDx(head: PartImage, face: [number, number, number, number] | undefined, scale: number): number {
+  if (!face) return 0;
+  const boxCtr = (head.left + head.right) / 2;
+  const faceCtr = face[0] + face[2] / 2;      // face 是**整幅图的绝对坐标**，别再叠一次 head.left
+  return (faceCtr - boxCtr) * scale;
+}
+
+/**
+ * 下巴到头贴图底边的那一段（逻辑单位）——**脖子要多伸这么长才够到下巴**。
+ *
+ * 头贴图是半身像，下缘渐隐（哪吒那件从 0.34 淡到 0），而下巴在整幅底边之上 4~16 像素
+ * （猪八戒的肖像里连胸口都有）。脖子原先只伸到固定高度，下巴与脖子之间就露出一截背景，
+ * 头和颈看着是断开的两截。多伸的这一截正好被头贴图自己的衣领盖住。
+ */
+export function chinGapOf(head: PartImage, face: [number, number, number, number] | undefined, scale: number): number {
+  if (!face) return 0;
+  const faceBottom = face[1] + face[3];   // 脸底（下巴）在**整幅图**里的位置（绝对坐标）
+  return Math.max(0, (head.bottom - faceBottom) * scale);
 }
 const HEAD_R = 16; // 程序化圆头半径
 
@@ -846,6 +1054,26 @@ export function headAnchor(shX: number, shY: number, lean: number, fc: number): 
     cy: shY + uy * NECK_LEN + vy * CHIN_OFFSET,
     angle: lean * HEAD_LEAN_FOLLOW * fc,
   };
+}
+
+/**
+ * 近侧手臂的肩点（屏幕上）。躯干贴图是 3/4 侧身的衣服，近肩在画面左侧；
+ * 肩点往那边挪，手臂才是从肩膀长出来的（见 NEAR_ARM_DX 的说明）。
+ * 导出给测试与探针：量与画必须走同一条路径。
+ */
+export function nearArmAnchor(
+  shX: number, shY: number, fc: number, dx = NEAR_ARM_DX, dy = NEAR_ARM_DY,
+): [number, number] {
+  return [shX - dx * fc, shY + dy];
+}
+
+/**
+ * 后侧手臂的肩点（屏幕上）。与 nearArmAnchor 是一对：**同一个肩点只能有一处定义**——
+ * 解算后臂角度的地方与画后手的地方各抄一份的话，两边会差一整个偏移量，
+ * 画面上就是"手握上了却离杆二十几像素"（这坑真的踩过）。
+ */
+export function backArmAnchor(shX: number, shY: number, fc: number): [number, number] {
+  return [shX + FAR_ARM_DX * fc, shY + FAR_ARM_DY];
 }
 
 /** 关节粗、末端细的锥形笔触路径：两端各带半圆帽，撑出笔锋起收笔的圆润感。
@@ -946,8 +1174,7 @@ const LIMB_STROKE = 1.5;
  * base 是这一节的**平涂本色**：填充用的是渐变（从渐变里读不出底色），描边色得另算一份，
  * 所以由调用方显式传进来。
  */
-function fillTapered(ctx: CanvasRenderingContext2D, x1: number, y1: number, x2: number, y2: number, w: number, white: boolean, taper = TAPER, capStart = true, base = '#000') {
-  const r1 = w / 2, r2 = (w * taper) / 2;
+function fillTapered(ctx: CanvasRenderingContext2D, x1: number, y1: number, x2: number, y2: number, r1: number, r2: number, white: boolean, capStart = true, base = '#000') {
   taperedPath(ctx, x1, y1, x2, y2, r1, r2);     // 填充要圆帽：起点被平切的话接缝处是个口子
   ctx.fill();
   if (!white) {
@@ -977,8 +1204,49 @@ function ballGrad(ctx: CanvasRenderingContext2D, cx: number, cy: number, r: numb
  *
  * 画在兵器**之后**——手压在杆上才是握住；画在之前会被杆盖掉，等于没加。
  * 有美术贴图时不画：那时手已经在图里了，再叠一个圆是两只手。
+ *
+ * 四种手：拳（默认）/ 爪 / 掌 / 骨手。手是隔着屏幕认人的第一眼——比脸还小，但它一直在动，
+ * 而十二个人此前全是同一颗圆，读起来就像同一副假人换了身衣服。
  */
-function drawHand(ctx: CanvasRenderingContext2D, at: [number, number], fill: string, white: boolean) {
+function drawHand(
+  ctx: CanvasRenderingContext2D, at: [number, number], fill: string, white: boolean,
+  kind: 'fist' | 'claw' | 'paw' | 'bone' = 'fist',
+) {
+  if (kind === 'claw') {
+    // 爪：三根锥形指从腕上张开，猴王的手
+    ctx.fillStyle = white ? '#fff' : fill;
+    ctx.beginPath(); ctx.arc(at[0], at[1], 4.4, 0, Math.PI * 2); ctx.fill();
+    for (const a of [-0.66, 0, 0.66]) {
+      const ex = at[0] + Math.sin(a) * 9, ey = at[1] + Math.cos(a) * 9;
+      fillTapered(ctx, at[0], at[1], ex, ey, 1.7, 0.5, white, true, fill);
+    }
+    return;
+  }
+  if (kind === 'bone') {
+    // 骨手：三根细骨，白骨精的手（没有肉）
+    ctx.strokeStyle = white ? '#fff' : shade(fill, 22);
+    ctx.lineWidth = 1.7; ctx.lineCap = 'round';
+    for (const a of [-0.52, 0.04, 0.56]) {
+      ctx.beginPath();
+      ctx.moveTo(at[0], at[1]);
+      ctx.lineTo(at[0] + Math.sin(a) * 8.5, at[1] + Math.cos(a) * 8.5);
+      ctx.stroke();
+    }
+    return;
+  }
+  if (kind === 'paw') {
+    // 掌：宽厚的一只厚爪，猪八戒
+    ctx.fillStyle = white ? '#fff' : fill;
+    ctx.beginPath(); ctx.ellipse(at[0], at[1], 7.6, 6.4, 0, 0, Math.PI * 2); ctx.fill();
+    if (!white) { ctx.strokeStyle = contourOf(fill); ctx.lineWidth = LIMB_STROKE; ctx.stroke(); }
+    ctx.fillStyle = white ? '#fff' : shade(fill, -24);
+    for (const a of [-0.52, 0, 0.52]) {
+      ctx.beginPath();
+      ctx.arc(at[0] + Math.sin(a) * 5.4, at[1] + Math.cos(a) * 4.8, 2, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    return;
+  }
   // 半径 6.6：5.2 那版**在实机上认不出是手**——前臂末端本来就有 5px 的笔锋，
   // 两者一样粗时读成"笔锋收了个圆头"，而不是"这里有只手"。手要比它握的那截明显粗一圈。
   ctx.fillStyle = white ? '#fff' : fill;
@@ -1032,7 +1300,11 @@ function drawFoot(ctx: CanvasRenderingContext2D, at: [number, number], facing: n
 /** 角色脚下的地面投影：宽度随 def.width，透明度随离地高度衰减，画在角色之前、地面之后。
  *
  * 用径向渐变而不是平涂椭圆。平涂那版两头一样黑：暗关卡上等于没画（地板本来就是黑的），
- * 亮关卡上是一枚边缘生硬的黑色补丁。径向渐变中心实、四周淡开，两种背景上都成立。 */
+ * 亮关卡上是一枚边缘生硬的黑色补丁。径向渐变中心实、四周淡开，两种背景上都成立。
+ *
+ * 影子分两摊：外圈那摊大的软影管"他在那儿"，中间那摊小的接触影管"他**站着**"——
+ * 没有接触影的时候，角色读起来像是浮在地面上方一寸（尤其跳跃落地的瞬间）。
+ */
 function drawShadow(ctx: CanvasRenderingContext2D, x: number, y: number, width: number) {
   const t = Math.max(0.15, 1 - y / 150);
   const w = width * 0.9 * (0.7 + t * 0.3);
@@ -1044,6 +1316,301 @@ function drawShadow(ctx: CanvasRenderingContext2D, x: number, y: number, width: 
   ctx.beginPath();
   ctx.ellipse(x, FLOOR_Y, w / 2, w / 7, 0, 0, Math.PI * 2);
   ctx.fill();
+  // 接触影：脚底一小块，更实更小
+  const cw = w * 0.36;
+  const cg = ctx.createRadialGradient(x, FLOOR_Y, 0, x, FLOOR_Y, cw);
+  cg.addColorStop(0, `rgba(0,0,0,${0.46 * t})`);
+  cg.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = cg;
+  ctx.beginPath();
+  ctx.ellipse(x, FLOOR_Y, cw, cw / 5.5, 0, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+/**
+ * 角色背后的光晕：把他从背景里托出来。
+ *
+ * 夜里角色的深色衣服（哪吒的红、钟馗的紫）跟夜色几乎同色，不打这道光，角色就像贴在
+ * 背景上的一张纸。街机格斗里角色的可读性大半靠这层背光——月亮从他背后打过来，
+ * 轮廓上就有一圈晕。
+ *
+ * 用场景自己的光源色（天体色）——同一关里所有人被同一盏光照，十二关之间也各有各的光。
+ * 走 'lighter' 叠加：它是"加上去的光"，不是"盖上去的一块色"。
+ */
+function drawBacklight(ctx: CanvasRenderingContext2D, x: number, feetY: number, color: string) {
+  const cy = feetY - 72;
+  const g = ctx.createRadialGradient(x, cy, 12, x, cy, 130);
+  g.addColorStop(0, hexAlpha(color, 0.16));
+  g.addColorStop(0.55, hexAlpha(color, 0.07));
+  g.addColorStop(1, hexAlpha(color, 0));
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  ctx.fillStyle = g;
+  ctx.beginPath();
+  ctx.ellipse(x, cy, 130, 142, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
+/**
+ * 脖子：头与躯干之间那一小段。
+ *
+ * **他们此前根本没有脖子**，于是头看着像浮在身上。根因不是挂载算错，是**躯干贴图的上缘是
+ * 透明的**：领口画在贴图的上边以下（哪吒那件是 V 领），于是头贴图的底边与领口之间总会露
+ * 一线背景——实测 4 个逻辑单位，正好是那条缝。
+ *
+ * 补一段脖子，缝就没了，角色也终于有脖子。颜色取 accent：那本来就是程序化圆头用的颜色，
+ * 也就是这个角色在这套画法里的"肤色"（十二个人的 accent 都是肤色调或骨白）。
+ *
+ * 画在躯干之后、头之前：脖子压在肩膀上、头压在脖子上。
+ *
+ * **上端必须够到下巴**：头贴图是半身像，下缘是渐隐的（哪吒那件从 0.34 一路淡到 0），
+ * 而下巴在整幅底边之上 4~16 像素（猪八戒的肖像里连胸口都有）。脖子若只伸到固定高度，
+ * 下巴与脖子之间就露出一截背景——**头和颈看着是断开的两截**（玩家报的就是这个）。
+ * `chinGap` 就是下巴到头贴图底边的那一段，脖子多伸这么长，缝就没了；
+ * 多出来的一截正好被头贴图自己的衣领盖住（头画在脖子之后）。
+ */
+function drawNeck(
+  ctx: CanvasRenderingContext2D, shX: number, shY: number, lean: number, fc: number,
+  accent: string, white: boolean, chinGap = 0,
+) {
+  const ux = Math.sin(lean) * fc, uy = -Math.cos(lean);   // 躯干轴向（肩→头顶）
+  // 上端伸进头里 5，再多伸下巴到头贴图底边的那一段；下端伸进躯干里 3：
+  // 两头都藏进去，才不会在任一端露线。
+  const topX = shX + ux * (NECK_LEN + 5 + chinGap), topY = shY + uy * (NECK_LEN + 5 + chinGap);
+  const botX = shX - ux * 3, botY = shY - uy * 3;
+  ctx.fillStyle = white ? '#fff' : accent;
+  // 上细下粗：脖子在肩膀处比在颌下宽（斜方肌），上下反过来就成了"塞进去的萝卜"。
+  // **半径要小**：8~11 单位的脖子在 40 宽的身体上就是一根柱子，压在胸口上像围脖；
+  // 6~9 才像脖子。
+  fillTapered(ctx, topX, topY, botX, botY, 3.2, 4.4, white, true, accent);
+}
+
+/**
+ * 从**躯干贴图**上取两个颜色：近肩（手臂插进去的地方）与颈口（脖子接的地方）。
+ *
+ * 为什么不用调色板里的颜色：手臂与脖子是**程序化圆柱**，躯干是画出来的衣服，
+ * 两者的颜色对不上，画面上就是"一件贴上去的色块"——钟馗的紫灰手臂压在朱砂袍上、
+ * 铁扇的薄荷绿手臂压在青衣上、红孩儿的粉手臂压在红衣上，都是这一条。
+ * accent 也不对：十二个人里有一半的 accent 是**近白**（铁扇 #eef3ea、后羿 #f2efe6…），
+ * 拿它画手臂等于在身上贴一条白带子；调色板里本来就没有"皮肤"这一项。
+ *
+ * 直接从素材上量：近肩那块的颜色**正是手臂要接上的那块**，
+ * 手臂取它，接口处必然同色——不管美术画的是裸肩（白骨精）、还是铠甲肩（牛魔王、钟馗、刑天）。
+ * 颈口同理：脖子取美术那一截脖子的颜色。
+ *
+ * 量法：把贴图画到离屏 canvas 上，在对应位置取一个小邻域的**众数颜色**
+ * （众数而不是均值——均值会被描边和阴影拉灰）。
+ */
+const torsoColorCache = new WeakMap<HTMLImageElement, { shoulder: string; neck: string; cloth: string }>();
+
+function sampleTorsoColor(
+  ctx: CanvasRenderingContext2D, W: number, H: number,
+  fx: number, fy: number, r: number,
+): string | null {
+  // fx/fy 是内容框内的相对位置（0~1），r 是取样半径（内容框宽的比例）
+  const cx = fx * W, cy = fy * H, rr = Math.max(2, r * W);
+  const x0 = Math.max(0, Math.floor(cx - rr)), x1 = Math.min(W - 1, Math.ceil(cx + rr));
+  const y0 = Math.max(0, Math.floor(cy - rr)), y1 = Math.min(H - 1, Math.ceil(cy + rr));
+  if (x1 <= x0 || y1 <= y0) return null;
+  const d = ctx.getImageData(x0, y0, x1 - x0 + 1, y1 - y0 + 1).data;
+  const counts = new Map<number, { n: number; r: number; g: number; b: number }>();
+  for (let i = 0; i < d.length; i += 4) {
+    if (d[i + 3] < 160) continue;
+    const lum = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
+    if (lum < 34 || lum > 246) continue;         // 描边与纯白跳过
+    const key = (d[i] >> 4) << 8 | (d[i + 1] >> 4) << 4 | (d[i + 2] >> 4);
+    const e = counts.get(key) ?? { n: 0, r: 0, g: 0, b: 0 };
+    e.n++; e.r += d[i]; e.g += d[i + 1]; e.b += d[i + 2];
+    counts.set(key, e);
+  }
+  if (!counts.size) return null;
+  let best: { n: number; r: number; g: number; b: number } | null = null;
+  for (const e of counts.values()) if (!best || e.n > best.n) best = e;
+  if (!best) return null;
+  const cr = Math.round(best.r / best.n), cg = Math.round(best.g / best.n), cb = Math.round(best.b / best.n);
+  return `rgb(${cr},${cg},${cb})`;
+}
+
+/** 一块区域里的主色（出现最多的颜色，按 16 级分桶）。取不到返回 null。 */
+function dominantColor(
+  ctx: CanvasRenderingContext2D, W: number, H: number, y0: number, y1: number,
+): string | null {
+  const d = ctx.getImageData(0, Math.floor(H * y0), W, Math.ceil(H * (y1 - y0))).data;
+  const counts = new Map<number, { n: number; r: number; g: number; b: number }>();
+  for (let i = 0; i < d.length; i += 4) {
+    if (d[i + 3] < 160) continue;
+    const key = (d[i] >> 4) << 8 | (d[i + 1] >> 4) << 4 | (d[i + 2] >> 4);
+    const e = counts.get(key) ?? { n: 0, r: 0, g: 0, b: 0 };
+    e.n++; e.r += d[i]; e.g += d[i + 1]; e.b += d[i + 2];
+    counts.set(key, e);
+  }
+  let best: { n: number; r: number; g: number; b: number } | null = null;
+  for (const e of counts.values()) if (!best || e.n > best.n) best = e;
+  if (!best) return null;
+  return `rgb(${Math.round(best.r / best.n)},${Math.round(best.g / best.n)},${Math.round(best.b / best.n)})`;
+}
+
+/**
+ * 近肩那块**肩头**的中心（内容框里的相对坐标）。
+ *
+ * 找法不认颜色：肩头是"与衣服不同"的那一块（肤色的圆块、或空的深色袖窿都算），
+ * 位置在顶部左侧。先量它的位置，再**在那个位置取色**——
+ * 直接在左上角取主色会取到衣服（肩头只占那一小块），手臂就会穿上衣服的颜色，
+ * 和肩头之间留一道色阶，看着像贴上去的。
+ */
+function capCenter(
+  ctx: CanvasRenderingContext2D, W: number, H: number, cloth: string | null,
+): { cx: number; cy: number } | null {
+  const m = cloth && cloth.match(/(\d+),\s*(\d+),\s*(\d+)/);
+  const dr = m ? +m[1] : -1, dg = m ? +m[2] : -1, db = m ? +m[3] : -1;
+  const TOL = 46;
+  const d = ctx.getImageData(0, 0, W, Math.floor(H * 0.28)).data;
+  let sx = 0, sy = 0, n = 0;
+  const cols = new Map<number, number>();
+  for (let y = 0; y < Math.floor(H * 0.28); y++) {
+    for (let x = 0; x < Math.floor(W * 0.38); x++) {
+      const i = (y * W + x) * 4;
+      if (d[i + 3] < 200) continue;
+      if (cloth && Math.abs(d[i] - dr) <= TOL && Math.abs(d[i + 1] - dg) <= TOL && Math.abs(d[i + 2] - db) <= TOL) continue;
+      sx += x; sy += y; n++;
+      cols.set(Math.floor(x / 6), (cols.get(Math.floor(x / 6)) ?? 0) + 1);
+    }
+  }
+  if (n < 30) return null;
+  // 最靠左且够大的一档（描边/杂点不算）
+  let pick = -1;
+  for (const [k, v] of [...cols.entries()].sort((a, b) => a[0] - b[0])) {
+    if (v >= Math.max(8, W * H * 0.004)) { pick = k; break; }
+  }
+  if (pick < 0) return null;
+  let sx2 = 0, sy2 = 0, n2 = 0;
+  for (let y = 0; y < Math.floor(H * 0.28); y++) {
+    for (let x = pick * 6; x < pick * 6 + 6 && x < W; x++) {
+      const i = (y * W + x) * 4;
+      if (d[i + 3] < 200) continue;
+      if (cloth && Math.abs(d[i] - dr) <= TOL && Math.abs(d[i + 1] - dg) <= TOL && Math.abs(d[i + 2] - db) <= TOL) continue;
+      sx2 += x; sy2 += y; n2++;
+    }
+  }
+  if (n2 < 8) return null;
+  return { cx: sx2 / n2 / W, cy: sy2 / n2 / H };
+}
+
+/** 近肩、衣身两处颜色。取不到（没有躯干贴图 / 读像素失败）就退回 fallback。 */
+export function torsoColors(part: PartImage | undefined, fallback: string): { shoulder: string; neck: string; cloth: string } {
+  if (!part) return { shoulder: fallback, neck: fallback, cloth: fallback };
+  const hit = torsoColorCache.get(part.img);
+  if (hit) return hit;
+  const out = { shoulder: fallback, neck: fallback, cloth: fallback };
+  try {
+    if (typeof document !== 'undefined') {
+      const W = part.right - part.left, H = part.bottom - part.top;
+      if (W > 0 && H > 0) {
+        const c = document.createElement('canvas');
+        c.width = W; c.height = H;
+        const cctx = c.getContext('2d');
+        if (cctx) {
+          cctx.drawImage(part.img, part.left, part.top, W, H, 0, 0, W, H);
+          const cloth = dominantColor(cctx, W, H, 0.35, 0.65);
+          const cap = capCenter(cctx, W, H, cloth);
+          if (cap) out.shoulder = sampleTorsoColor(cctx, W, H, cap.cx, cap.cy, 0.035) ?? fallback;
+          if (cloth) out.cloth = cloth;
+          out.neck = fallback;
+        }
+      }
+    }
+  } catch { /* 取不到就用 fallback */ }
+  torsoColorCache.set(part.img, out);
+  return out;
+}
+
+/**
+ * **脸的肤色**——从头部贴图上量（脸的框由角色数据给出，取上半部分避开胡子与嘴）。
+ * 脖子的颜色要用它：脖子是脸的下半截延续，用别的颜色就会出现"下巴这块颜色变了"。
+ */
+const faceToneCache = new WeakMap<HTMLImageElement, string>();
+export function faceTone(
+  head: PartImage | undefined, face: [number, number, number, number] | undefined, fallback: string,
+): string {
+  if (!head || !face) return fallback;
+  const hit = faceToneCache.get(head.img);
+  if (hit) return hit;
+  let out = fallback;
+  try {
+    if (typeof document !== 'undefined') {
+      const [fx, fy, fw, fh] = face;
+      const x0 = Math.max(0, fx), y0 = Math.max(0, fy);
+      const w = Math.min(head.img.naturalWidth - x0, fw);
+      const h = Math.min(head.img.naturalHeight - y0, Math.floor(fh * 0.55));
+      if (w > 4 && h > 4) {
+        const c = document.createElement('canvas');
+        c.width = w; c.height = h;
+        const cctx = c.getContext('2d');
+        if (cctx) {
+          cctx.drawImage(head.img, fx, fy, w, h, 0, 0, w, h);
+          out = dominantColor(cctx, w, h, 0, 1) ?? fallback;
+        }
+      }
+    }
+  } catch { /* 取不到就用 fallback */ }
+  faceToneCache.set(head.img, out);
+  return out;
+}
+
+/** 一根骨段的两端 */
+interface Bone { x1: number; y1: number; x2: number; y2: number }
+
+/**
+ * 手臂上的装束：袖口 / 护腕 / 毛边。
+ *
+ * 光溜溜的锥形色管是"假人"的主因——十二个人此前的手脚是同一条模具出来的，只有颜色不同。
+ * 装束是最快的解：给手臂加一件东西，它就属于某个人了。
+ * （出四肢贴图是另一条路，但一张图要同时拉伸到上臂与前臂两段长度，细节全被拉没——
+ *  这条路的性价比不如在程序化画法上加装束。）
+ */
+function drawSleeve(
+  ctx: CanvasRenderingContext2D,
+  kind: 'cuff' | 'bracer' | 'fur' | 'none' | undefined,
+  upper: Bone, fore: Bone, w: number, color: string, white: boolean,
+  garment: string = color,
+) {
+  if (!kind || kind === 'none' || white) return;
+  if (kind === 'cuff') {
+    // 袖口：肘上张开的一截宽袖（铁扇公主的广袖、钟馗的官袍）——这是**衣服**的一截，
+    // 用衣服色，不是皮肤色
+    const dx = fore.x2 - fore.x1, dy = fore.y2 - fore.y1;
+    const len = Math.hypot(dx, dy) || 1;
+    const ax = fore.x1 + (dx / len) * 3, ay = fore.y1 + (dy / len) * 3;
+    const bx = fore.x1 + (dx / len) * 11, by = fore.y1 + (dy / len) * 11;
+    ctx.fillStyle = garment;
+    fillTapered(ctx, ax, ay, bx, by, w * 1.05, w * 0.735, false, false, garment);
+    return;
+  }
+  if (kind === 'bracer') {
+    // 护腕：前臂中段一道加宽压深的箍（二郎的天眼护腕、后羿的射弓臂）
+    const ax = fore.x1 + (fore.x2 - fore.x1) * 0.3, ay = fore.y1 + (fore.y2 - fore.y1) * 0.3;
+    const bx = fore.x1 + (fore.x2 - fore.x1) * 0.68, by = fore.y1 + (fore.y2 - fore.y1) * 0.68;
+    ctx.fillStyle = shade(color, -46);
+    fillTapered(ctx, ax, ay, bx, by, w * 0.675, w * 0.675, false, false, color);
+    return;
+  }
+  // 毛边：沿上臂两侧伸出几撮毛（猴王）
+  const dx = upper.x2 - upper.x1, dy = upper.y2 - upper.y1;
+  const len = Math.hypot(dx, dy) || 1;
+  const nx = -dy / len, ny = dx / len;
+  ctx.strokeStyle = shade(color, 26);
+  ctx.lineWidth = 1.5; ctx.lineCap = 'round';
+  for (let i = 0; i <= 3; i++) {
+    const t = 0.2 + i * 0.2;
+    const px = upper.x1 + dx * t, py = upper.y1 + dy * t;
+    for (const s of [-1, 1]) {
+      ctx.beginPath();
+      ctx.moveTo(px + nx * s * w * 0.42, py + ny * s * w * 0.42);
+      ctx.lineTo(px + nx * s * (w * 0.42 + 3.6) + dx * 0.07, py + ny * s * (w * 0.42 + 3.6) + dy * 0.07);
+      ctx.stroke();
+    }
+  }
 }
 
 /** 只算骨段末端、不绘制。seg() 的几何与它保持一致——两处各写一遍必然漂移。 */
@@ -1051,20 +1618,309 @@ export function segEnd(x: number, y: number, angle: number, len: number, facing:
   return [x + Math.sin(angle) * len * facing, y + Math.cos(angle) * len];
 }
 
+/**
+ * 双手兵器：哪些形制是两只手一起握的。
+ *
+ * 此前**所有**兵器都只有前手握着——兵器沿前臂方向画出去，后手是另画的一颗手，垂在身侧，
+ * 离杆子几十像素。九齿钉耙、如意金箍棒、三尖两刃刀这种长杆兵器现实中都是两手分握
+ * 杆上前后两处（否则重心在掌外，一挥就脱手），画面上单手拿长杆兵器读起来是"拿着道具"。
+ *
+ * 剑与扇是单手兵器（后手垂着才对）；弓是"一手持弓一手拉弦"，另有画法（见 backGrip）。
+ */
+const TWO_HANDED = new Set(['staff', 'rake', 'glaive', 'mace', 'spear', 'axe']);
+
+/**
+ * 两连杆 IK：肩 → 手，臂长 (upper, lower)。解不出（够不着/太近）返回 null。
+ *
+ * 约定与腿那条一致：骨段方向 = (sin a, cos a)，a=0 垂直向下、a>0 朝角色正面。
+ * 手臂的肘弯量是**加**的（腿是减）：armB = [大腿…] 前臂绝对角 = 上臂角 + 肘弯量。
+ * 肘挑哪个解：**肘在下**（自然肘位）——两个解里屏幕坐标 y 大的那个。
+ */
+function armIK(sx: number, sy: number, tx: number, ty: number, upper: number, lower: number): [number, number] | null {
+  const dx = tx - sx, dy = ty - sy;
+  const d = Math.hypot(dx, dy);
+  if (d > upper + lower - 0.5 || d < Math.abs(upper - lower) + 0.5) return null;
+  const a = (upper * upper - lower * lower + d * d) / (2 * d);
+  const h = Math.sqrt(Math.max(0, upper * upper - a * a));
+  const mx = sx + dx * a / d, my = sy + dy * a / d;
+  const px = -dy / d, py = dx / d;
+  const e1: [number, number] = [mx + h * px, my + h * py];
+  const e2: [number, number] = [mx - h * px, my - h * py];
+  const elbow = e1[1] >= e2[1] ? e1 : e2;         // 肘在下
+  const upAng = Math.atan2(elbow[0] - sx, elbow[1] - sy);
+  const foAng = Math.atan2(tx - elbow[0], ty - elbow[1]);
+  return [upAng, foAng - upAng];
+}
+
+/**
+ * 后手该落在哪儿：握在兵器的杆上。
+ *
+ * 双手兵器：后手抓**杆上离后肩最近的那一段**——手里握着杆子，后手总是抓在够得到的最靠后
+ *  处；够不到就抓不到（那一条角度不可达，退回姿势里原来的后臂）。
+ * 弓：后手拉弦，落在弓身中点沿持弓方向往回拉一段。
+ *
+ * 返回后臂的两段角度；null = 用姿势里原来的后臂。
+ */
+function backGrip(
+  bshX: number, bshY: number, fElbow: [number, number], fHand: [number, number],
+  w: WeaponDef, fc: number,
+  upperArm = UPPER_ARM, lowerArm = LOWER_ARM,
+): [number, number] | null {
+  if (!TWO_HANDED.has(w.kind)) return null;   // 单手兵器：后手垂着才对
+  const dx = fHand[0] - fElbow[0], dy = fHand[1] - fElbow[1];
+  const L = Math.hypot(dx, dy) || 1;
+  const ux = dx / L, uy = dy / L;
+  // 沿杆往握点后方的距离
+  const t = Math.max(13, Math.min(
+    (fHand[0] - bshX) * ux + (fHand[1] - bshY) * uy,   // 杆上离后肩最近的那一点
+    w.len * w.grip,                                    // 不得越过杆尾
+  ));
+  const tx = fHand[0] - ux * t, ty = fHand[1] - uy * t;
+  // 够不着就够不着：手放开兵器（后臂用姿势里原来的角度），绝不硬掰
+  return armIK(bshX, bshY, tx, ty, upperArm, lowerArm);
+}
+
+/**
+ * 弓：后手拉弦，弦汇到它上面。拉弦的手要拉到颊边（弦才拉得开），
+ * 而后手到颊边这一段，恰好让**头落在双手之间**——一手持弓一手拉弦，弓与头是一体的。
+ */
+const BOW_PULL = 34;
+
+/**
+ * 双手兵器的后臂：手落在兵器杆上（或拉弓的弦上），后臂由"手落在哪"反解。
+ *
+ * 导出给测试与探针——测量与渲染必须走同一条路径，两处各算一遍必然漂移。
+ * 返回后臂的两段角度；null = 单手兵器，或那个位置够不着（退回姿势里原来的后臂）。
+ */
+export function backArmFor(
+  p: Pose, x: number, feetY: number, fc: number, w?: WeaponDef,
+  build?: CharacterDef['build'], rig?: CharacterRig,
+): [number, number] | null {
+  if (!w) return null;
+  // 纸偶角色用的是**这个人自己的**骨架（臂长、肩点位置都不同），
+  // 拿共用骨架去解 IK，解出来的手落点会偏出杆子几十像素。
+  if (rig) {
+    const a = dollAnchors(x, feetY, p.lean, p.crouch, fc, rig);
+    const upperArm = rig.upperArm, lowerArm = rig.lowerArm;
+    const fElbow = segEnd(a.nshX, a.nshY, p.armF[0], upperArm, fc);
+    const fHand = segEnd(fElbow[0], fElbow[1], p.armF[0] + p.armF[1], lowerArm, fc);
+    if (w.kind === 'bow') {
+      const dx = fHand[0] - fElbow[0], dy = fHand[1] - fElbow[1];
+      const L = Math.hypot(dx, dy) || 1;
+      const ux = dx / L, uy = dy / L;
+      return armIK(a.bshX, a.bshY, fHand[0] - ux * BOW_PULL, fHand[1] - uy * BOW_PULL, upperArm, lowerArm);
+    }
+    const grip = backGrip(a.bshX, a.bshY, fElbow, fHand, w, fc, upperArm, lowerArm);
+    // 纸偶角色的近肩在**身体的轮廓边**上（画里就是这么画的），前臂因此比旧管线更靠前，
+    // 杆上给后手留的那一截会落到身体**前面**去——后臂要横穿胸口才能握到，
+    // 手还会从身体左侧探出来（在画面上就是一只悬在体侧的手）。
+    // 与其硬掰，不如不握：后臂按姿势垂着，兵器单手拿着。
+    if (grip) {
+      const ux = fHand[0] - fElbow[0], uy = fHand[1] - fElbow[1];
+      const L = Math.hypot(ux, uy) || 1;
+      const buttX = fHand[0] - (ux / L) * (w.len * w.grip);   // 杆尾
+      if ((buttX - x) * fc < 0) return null;                  // 杆尾在身体前侧 = 握不住
+    }
+    return grip;
+  }
+  const { shX, shY } = torsoAnchors(x, feetY, p.lean, p.crouch, fc);
+  const [bshX, bshY] = backArmAnchor(shX, shY, fc);
+  const [nshX, nshY] = nearArmAnchor(shX, shY, fc, build?.shoulderDx, build?.shoulderDy);
+  const fElbow = segEnd(nshX, nshY, p.armF[0], UPPER_ARM, fc);
+  const fHand = segEnd(fElbow[0], fElbow[1], p.armF[0] + p.armF[1], LOWER_ARM, fc);
+  if (w.kind === 'bow') {
+    // 拉弦的手：一手持弓一手拉弦，弦汇到它上面
+    const dx = fHand[0] - fElbow[0], dy = fHand[1] - fElbow[1];
+    const L = Math.hypot(dx, dy) || 1;
+    const ux = dx / L, uy = dy / L;
+    return armIK(bshX, bshY, fHand[0] - ux * BOW_PULL, fHand[1] - uy * BOW_PULL,
+      UPPER_ARM, LOWER_ARM);
+  }
+  return backGrip(bshX, bshY, fElbow, fHand, w, fc);
+}
+
+/** 后手（握杆的那只）在屏幕上的位置。量「头在不在双手中间」时用它。 */
+export function backHandFor(
+  p: Pose, x: number, feetY: number, fc: number, w?: WeaponDef,
+): [number, number] {
+  const { shX, shY } = torsoAnchors(x, feetY, p.lean, p.crouch, fc);
+  const [bshX, bshY] = backArmAnchor(shX, shY, fc);
+  const armB = backArmFor(p, x, feetY, fc, w) ?? p.armB;
+  const elbow = segEnd(bshX, bshY, armB[0], UPPER_ARM, fc);
+  return segEnd(elbow[0], elbow[1], armB[0] + armB[1], LOWER_ARM, fc);
+}
+
+/**
+ * 肩点（翅膀、飘带这些附属层的挂点）。
+ *
+ * 为什么要有这个：附属层挂在**身体中轴**的肩点上，而纸偶角色的肩点高度与
+ * 横向位置是**这个人自己的**（build.rig 量自整人那张画）。还用共用骨架的肩点，
+ * 雷震子的翅膀就会落到一个不是肩膀的地方——画面上等于没有翅膀。
+ */
+export function shoulderAnchor(
+  x: number, feetY: number, lean: number, crouch: number, fc: number, rig?: CharacterRig,
+): [number, number] {
+  if (rig) {
+    const a = dollAnchors(x, feetY, lean, crouch, fc, rig);
+    return [a.shX, a.shY];
+  }
+  const a = torsoAnchors(x, feetY, lean, crouch, fc);
+  return [a.shX, a.shY];
+}
+
+/**
+ * 纸偶骨架的锚点（髋/肩/下巴/近肩/后肩）。
+ *
+ * 与 drawDollLimbs 共用同一份算法——量与画必须走同一条路，两处各算一遍必然漂移
+ * （探针量出来的关节和画出来的关节对不上，就是这么来的）。
+ */
+export function dollAnchors(
+  x: number, feetY: number, lean: number, crouch: number, fc: number, rig: CharacterRig,
+) {
+  const hipX = x;
+  const hipY = feetY - rig.hipY + crouch;
+  const shLen = rig.shoulderY - rig.hipY;
+  const chinLen = rig.chinY - rig.hipY;
+  const shX = hipX + Math.sin(lean) * shLen * fc;
+  const shY = hipY - Math.cos(lean) * shLen + crouch * 0.2;
+  const chinX = hipX + Math.sin(lean) * chinLen * fc;
+  const chinY = hipY - Math.cos(lean) * chinLen + crouch * 0.2;
+  return {
+    hipX, hipY, shX, shY, chinX, chinY,
+    // 近肩/后肩的横向位置取自这张画（近侧在画面左、后侧在画面右，见 NEAR_ARM_DX 的说明）
+    nshX: x + rig.shoulderDx * fc, nshY: shY,
+    bshX: x + rig.backShoulderDx * fc, bshY: shY,
+  };
+}
+
+/**
+ * 纸偶角色：整人一张画，在关节处切开动。
+ *
+ * 为什么另起一条路，而不是在原来那条里加分支：原来那条的每一样都是**十二人共用**的
+ * ——肩 118、髋 62、上臂 26、大腿 32、躯干宽 40、头高 40。纸偶件是按画里的原尺寸
+ * 切下来的，挂上去若按共用骨架抻开，猪八戒画里 15% 高的短腿会变成 64 单位的长腿、
+ * 小孩的短手臂会被抻长：比例一丢，"整人一张画"就只剩"同一套颜色"的意思。
+ * 所以这里用**这个人自己的**骨架尺寸（build.rig，由 design-preview/tools/cut-fullbody.py
+ * 从画里量出来），每一块按画里的原尺寸 1:1 落位。
+ *
+ * 另一处不同：**不画程序化脖子**。画里脖子本来就在（头那一块的下面一截就是），
+ * 再叠一根半径 3.2 的细脖子，等于在脖子上贴一根柱。
+ */
+function drawDollLimbs(
+  ctx: CanvasRenderingContext2D, p: Pose, x: number, feetY: number, fc: number,
+  doll: DollParts, rig: CharacterRig, white: boolean,
+  weapon?: WeaponDef, weaponScale = 1, weaponGlow = 0,
+  build?: CharacterDef['build'],
+): void {
+  const k = rig.k;
+  const segHalfW = (q: PartImage) => (q.right - q.left) * k / 2;
+
+  const armFU = doll.armFU!, armFL = doll.armFL!, handF = doll.handF!;
+  const legFU = doll.legFU!, legFL = doll.legFL!, footF = doll.footF!;
+  // 段长取自 rig（切件时量好的），段宽取自贴图自身的内容框——
+  // 两者合起来保证每一块按画里的原尺寸落位，不抻不变形。
+  const upperArm = rig.upperArm, lowerArm = rig.lowerArm, handLen = rig.handLen;
+  const thigh = rig.thigh, shin = rig.shin;
+
+  const a = dollAnchors(x, feetY, p.lean, p.crouch, fc, rig);
+
+  // ---- 后侧肢体：先画，被躯干盖住 ----------------------------------------
+  const armB = backArmFor(p, x, feetY, fc, weapon, build, rig) ?? p.armB;
+  seg(ctx, a.bshX, a.bshY, armB[0], upperArm, segHalfW(armFU), 0, fc, '', armFU, white);
+  const bElbow = segEnd(a.bshX, a.bshY, armB[0], upperArm, fc);
+  seg(ctx, bElbow[0], bElbow[1], armB[0] + armB[1], lowerArm, segHalfW(armFL), 0, fc, '', armFL, white);
+  const bHand = segEnd(bElbow[0], bElbow[1], armB[0] + armB[1], lowerArm, fc);
+  seg(ctx, bHand[0], bHand[1], armB[0] + armB[1], handLen, segHalfW(handF), 0, fc, '', handF, white);
+  const bKnee = seg(ctx, a.hipX + (rig.legBDx ?? 0) * fc, a.hipY, p.legB[0], thigh, segHalfW(legFU), 0, fc, '', legFU, white);
+  const bAnk = seg(ctx, bKnee[0], bKnee[1], p.legB[0] - p.legB[1], shin, segHalfW(legFL), 0, fc, '', legFL, white);
+  drawDollFoot(ctx, bAnk, fc, footF, k, rig.footAnchorX, white);
+
+  // ---- 前臂几何：兵器要用 -------------------------------------------------
+  const fElbow = segEnd(a.nshX, a.nshY, p.armF[0], upperArm, fc);
+  const fHand = segEnd(fElbow[0], fElbow[1], p.armF[0] + p.armF[1], lowerArm, fc);
+
+  // ---- 躯干：从下巴画到腿根 ----------------------------------------------
+  // 这一段用的是**这个人的**长度（下巴→腿根），所以贴图 1:1 落位：画里的肩膀
+  // 就落在骨架的肩点上，不会被抻开。
+  drawBoneImg(ctx, a.chinX, a.chinY, a.hipX, a.hipY, segHalfW(doll.torso!), doll.torso!, white, fc);
+
+  // ---- 头：底边对齐下巴，横向**保持它在画里的位置** ------------------------
+  // 横向不按脸心再对齐一次（那是旧版单独头像的规则）：纸偶的头是从整人一张画上
+  // 裁下来的，脸相对身体的位置本来就是对的（角色朝右，脸心在中轴右边），
+  // 再对齐一次等于把整个头平移半个头宽（实测悟空偏了 12% 身高的横向量）。
+  // headDx 是头件裁剪框中心相对身体中轴的偏移（切件时量好）。
+  const head = doll.head!;
+  const hw = (head.right - head.left) * k, hh = (head.bottom - head.top) * k;
+  ctx.save();
+  ctx.translate(a.chinX + (rig.headDx ?? 0) * fc, a.chinY);
+  ctx.rotate(p.lean * HEAD_LEAN_FOLLOW * fc);
+  ctx.scale(fc, 1);
+  const sw = head.right - head.left, sh = head.bottom - head.top;
+  if (white) drawWhitePart(ctx, head, head.left, head.top, sw, sh, -hw / 2, -hh, hw, hh);
+  else ctx.drawImage(head.img, head.left, head.top, sw, sh, -hw / 2, -hh, hw, hh);
+  ctx.restore();
+
+  // ---- 前侧肢体：后画，压在躯干之上 --------------------------------------
+  const fKnee = seg(ctx, a.hipX + (rig.legFDx ?? 0) * fc, a.hipY, p.legF[0], thigh, segHalfW(legFU), 0, fc, '', legFU, white);
+  const fAnk = seg(ctx, fKnee[0], fKnee[1], p.legF[0] - p.legF[1], shin, segHalfW(legFL), 0, fc, '', legFL, white);
+  drawDollFoot(ctx, fAnk, fc, footF, k, rig.footAnchorX, white);
+
+  // ---- 兵器：在躯干与腿**之后**、在手之前 --------------------------------
+  // 为什么与旧管线相反：旧管线里兵器压在躯干之前，是因为那柄枪横过胸口，
+  // 压在躯干上会读成"兵器穿过身体"。纸偶角色的手在**身体的轮廓边**上（画里就是
+  // 这么画的），兵器顺着前臂朝前下就整根插进身体与腿里——只露出一截枪尖。
+  // 手在身前，兵器本就在身前：画在躯干与腿之后才是对的；
+  // 画在手之前，手才压得住杆（"手握着杆"这件事本身就是那个前后关系）。
+  //
+  // 长度**不**按手臂比例缩：兵器的长度跟着判定框走（autoWeaponScale），
+  // 缩短了就够不到人（玩法的真值在这头）。
+  if (weapon) {
+    drawWeapon(ctx, fElbow, fHand, weapon, white, weaponScale, weaponGlow,
+      weapon.kind === 'bow' ? bHand : undefined);
+  }
+
+  seg(ctx, a.nshX, a.nshY, p.armF[0], upperArm, segHalfW(armFU), 0, fc, '', armFU, white);
+  const fElbow2 = segEnd(a.nshX, a.nshY, p.armF[0], upperArm, fc);
+  seg(ctx, fElbow2[0], fElbow2[1], p.armF[0] + p.armF[1], lowerArm, segHalfW(armFL), 0, fc, '', armFL, white);
+  const fHand2 = segEnd(fElbow2[0], fElbow2[1], p.armF[0] + p.armF[1], lowerArm, fc);
+  seg(ctx, fHand2[0], fHand2[1], p.armF[0] + p.armF[1], handLen, segHalfW(handF), 0, fc, '', handF, white);
+}
+
+/**
+ * 纸偶的脚：画在踝上，沿脚件自己的朝向（不跟小腿转——脚掌该是平的）。
+ *
+ * 锚点用**踝在脚件里的横向位置**（rig.footAnchorX）：裁脚那一块的横向范围
+ * 是连着脚背一起切下来的，踝在块里的位置不等于块的中点，按中点挂会歪。
+ */
+function drawDollFoot(
+  ctx: CanvasRenderingContext2D, ank: [number, number], facing: number,
+  part: PartImage, k: number, anchorX: number, white: boolean,
+) {
+  const w = (part.right - part.left) * k, h = (part.bottom - part.top) * k;
+  const x = ank[0] - anchorX * w * facing;
+  ctx.save();
+  ctx.translate(x, ank[1]);
+  ctx.scale(facing, 1);
+  const sw = part.right - part.left, sh = part.bottom - part.top;
+  if (white) drawWhitePart(ctx, part, part.left, part.top, sw, sh, 0, 0, w, h);
+  else ctx.drawImage(part.img, part.left, part.top, sw, sh, 0, 0, w, h);
+  ctx.restore();
+}
+
 /** 画一节骨段。`fill` 显式传进来而不是读 ctx.fillStyle——回读属性在真实画布上没问题，
  * 但测试里替身 ctx 的 fillStyle 是个桩（读出来是函数而不是颜色），而这条路径每个角色
  * 每帧要走八次，不该让渲染的正确性挂在替身身上。 */
 function seg(
-  ctx: CanvasRenderingContext2D, x: number, y: number, angle: number, len: number, w: number, facing: number,
+  ctx: CanvasRenderingContext2D, x: number, y: number, angle: number, len: number, r1: number, r2: number, facing: number,
   fill: string, img?: PartImage, white = false,
 ): [number, number] {
   const [ex, ey] = segEnd(x, y, angle, len, facing);
   if (img) {
-    drawBoneImg(ctx, x, y, ex, ey, w, img, white, facing);
+    drawBoneImg(ctx, x, y, ex, ey, r1, img, white, facing);
   } else {
-    ctx.fillStyle = white ? '#fff' : limbGrad(ctx, x, y, ex, ey, w, fill);
+    ctx.fillStyle = white ? '#fff' : limbGrad(ctx, x, y, ex, ey, r1 * 2, fill);
     // capStart=false：起点圆帽不描边，肘/膝上那道横贯的黑带就没了（原因见 fillTapered）
-    fillTapered(ctx, x, y, ex, ey, w, white, TAPER, false, fill);
+    fillTapered(ctx, x, y, ex, ey, r1, r2, white, false, fill);
   }
   return [ex, ey];
 }
@@ -1096,8 +1952,30 @@ export function drawLimbs(
   /** 头饰。与大招特写共用同一份画法（drawCrown）——对局里那颗头此前也是个光头圆，
    * 十二个人只差配色；而玩家绝大多数时间看的是这里，不是特写。 */
   crown?: CharacterDef['crown'],
+  /**
+   * 体型：四肢粗细、手形、装束。十二个人此前共用同一套四肢几何，只有颜色不同——
+   * 于是十二个人看着像同一副假人换了个色（见 CharacterDef.build）。
+   */
+  build?: CharacterDef['build'],
 ): void {
+  // 纸偶角色（整人一张画切出来的那一套）走自己的路：它有自己的骨架尺寸，
+  // 与共用骨架的那条并存。用 ?doll=1 打开（见 parts.ts 的 dollModeOn）。
+  const rig = build?.rig;
+  const doll = parts?.doll;
+  if (rig && doll && doll.torso && doll.head && doll.armFU && doll.armFL
+    && doll.handF && doll.legFU && doll.legFL && doll.footF) {
+    drawDollLimbs(ctx, p, x, feetY, fc, doll, rig, white, weapon, weaponScale, weaponGlow, build);
+    return;
+  }
   const { hipX, hipY, shX, shY } = torsoAnchors(x, feetY, p.lean, p.crouch, fc);
+  const armScale = build?.arm ?? 1, legScale = build?.leg ?? 1;
+  // 各段半径：基准值按体型倍率缩放。**相邻两段首尾相接**（LIMB_R 里就是这么定的），
+  // 所以关节处没有台阶——见 LIMB_R 的注释
+  const rU: [number, number] = [LIMB_R.upperArm[0] * armScale, LIMB_R.upperArm[1] * armScale];
+  const rF: [number, number] = [LIMB_R.foreArm[0] * armScale, LIMB_R.foreArm[1] * armScale];
+  const rT: [number, number] = [LIMB_R.thigh[0] * legScale, LIMB_R.thigh[1] * legScale];
+  const rS: [number, number] = [LIMB_R.shin[0] * legScale, LIMB_R.shin[1] * legScale];
+  const awL = rF[0] * 2;
 
   // 前臂（袖子）的颜色。此前直接取 accent，而十二个角色的 accent 大多是**近白的浅色**
   // ——铁扇 #eef3ea、后羿 #f2efe6、雷震子 #f0f4ff、二郎 #e8ecff、白骨精 #e8e4d6。
@@ -1107,25 +1985,73 @@ export function drawLimbs(
   // 对半之后仍然是"浅色袖 + 深衣"的两截配色，角色差异没丢，亮度落回角色自己的色系里。
   const sleeve = mixC(main, accent, 0.5);
 
+  // **手臂与脖子取躯干素材上的颜色**（见 torsoColors 的说明）：接口处必然同色。
+  // 调色板里没有"皮肤"这一项，而 accent 对一半角色是近白——拿它画手臂等于贴一条白带子。
+  const tc = torsoColors(parts?.torso, sleeve);
+  const skin = tc.shoulder;          // 近肩的颜色：手臂插进去的地方就是这个色
+  const backSkin = shade(skin, -25); // 后侧手臂压暗，拉开与躯干的纵深
+
   // 每条肢体只有一张图（无分大小臂/大小腿贴图），上下两段共用同一张部件图，
   // 各自按自己的段长/段宽独立挂载
   const backLimb = shade(main, -25);   // 后侧肢体压暗，靠这层拉开与躯干的纵深
-  let j = seg(ctx, shX, shY, p.armB[0], UPPER_ARM, 11, fc, backLimb, parts?.armB, white);
-  const handB = seg(ctx, j[0], j[1], p.armB[0] + p.armB[1], LOWER_ARM, 9, fc, backLimb, parts?.armB, white);
-  if (!parts?.armB) drawHand(ctx, handB, main, white);
-  j = seg(ctx, hipX, hipY, p.legB[0], THIGH, THIGH_W, fc, backLimb, parts?.legB, white);
-  const ankB = seg(ctx, j[0], j[1], p.legB[0] - p.legB[1], SHIN, 11, fc, backLimb, parts?.legB, white);
-  if (!parts?.legB) drawFoot(ctx, ankB, fc, backLimb, white);
+  // 后侧手臂往身后挪一截：同根同向画就整根埋在躯干里，画面上只剩一只手
+  const [bshX, bshY] = backArmAnchor(shX, shY, fc);
+  // 前臂的肘→手：兵器杆线就是它的方向。后手要落到杆上，得先知道杆线在哪
+  // 肩点用**近肩**（nearArmAnchor），不是身体中轴——前臂因此从肩膀长出来，而不是斜穿胸口
+  const [nshX, nshY] = nearArmAnchor(shX, shY, fc, build?.shoulderDx, build?.shoulderDy);
+  const fElbow = segEnd(nshX, nshY, p.armF[0], UPPER_ARM, fc);
+  const fHand = segEnd(fElbow[0], fElbow[1], p.armF[0] + p.armF[1], LOWER_ARM, fc);
+  // 双手兵器：后手去握杆（或拉弓的弦），后臂由"手落在哪"反解——与腿那条 IK 同一套道理。
+  // 握不到（角度不可达）就退回姿势里原来的后臂，绝不硬掰。
+  const gripArm = parts?.armB ? null : backArmFor(p, x, feetY, fc, weapon, build);
+  const armB = gripArm ?? p.armB;
+  let j = seg(ctx, bshX, bshY, armB[0], UPPER_ARM, rU[0], rU[1], fc, backSkin, parts?.armFU ?? parts?.armB, white);
+  const handB = seg(ctx, j[0], j[1], armB[0] + armB[1], LOWER_ARM, rF[0], rF[1], fc, backSkin, parts?.armFL ?? parts?.armB, white);
+  // 握杆的后手要压在兵器与身体**之上**（手在杆上，不是杆在身上），所以晚一点画
+  const deferBackHand = !parts?.armB && gripArm !== null;
+  if (!parts?.armB && !parts?.handF && !deferBackHand) drawHand(ctx, handB, backSkin, white, build?.hand);
+  j = seg(ctx, hipX, hipY, p.legB[0], THIGH, rT[0], rT[1], fc, backLimb, parts?.legFU ?? parts?.legB, white);
+  const ankB = seg(ctx, j[0], j[1], p.legB[0] - p.legB[1], SHIN, rS[0], rS[1], fc, backLimb, parts?.legFL ?? parts?.legB, white);
+  if (!parts?.legB && !parts?.footF) drawFoot(ctx, ankB, fc, backLimb, white);
+
+  // 前臂的几何已经算好（上面）：兵器要画在躯干**之前**。
+  // 兵器柄从身前横过胸口时，压在躯干上会读成"兵器穿过身体"；放到躯干之后，柄被身体盖住，
+  // 只有伸出去的那一截可见——那才是"手里握着兵器"该有的样子。
+  if (parts?.weapon) { // 有贴图就用贴图
+    seg(ctx, fHand[0], fHand[1], p.armF[0] + p.armF[1], 34, 4, 4, fc, main, parts.weapon, white);
+  } else if (weapon) { // 否则走程序化兵器：方向取前臂（肘→手）的实际朝向，不重算角度约定
+    drawWeapon(ctx, fElbow, fHand, weapon, white, weaponScale, weaponGlow,
+      weapon.kind === 'bow' && deferBackHand ? handB : undefined);
+  }
+
+  // 头的尺度与「下巴到头贴图底边」的那一段，都要先算出来：
+  // 脖子得按 chinGap 多伸一截才够到下巴（否则下巴与脖子之间露出一截背景）。
+  const headScaleVal = parts?.head ? headScale(parts.head) * (build?.head ?? 1) : 0;
+  const chinGap = parts?.head ? chinGapOf(parts.head, build?.face, headScaleVal) : 0;
+
+  // 脖子画在**躯干之前**。
+  //
+  // 脖子的位置见下面 `if (parts?.torso)` 那一段：画在躯干**之后**，
+  // 颜色取美术自己的颈窝色（torsoColors 的 neck），不是 accent。
 
   if (parts?.torso) {
     // 20 = 原胶囊 lineWidth；起点=肩，图片顶部对肩、底部对腰。两端各沿骨骼轴向多伸出
     // NECK_OVERLAP/WAIST_OVERLAP，让躯干贴图往上盖过颈部、往下盖过腰部，接缝做成重叠
     // 而不是贴边（下面头部绘制会盖在颈部重叠区之上，腰部的重叠区则被后画的腿盖住）
     const [tx, ty, hx, hy] = extendSeg(shX, shY, hipX, hipY, NECK_OVERLAP, WAIST_OVERLAP);
-    drawBoneImg(ctx, tx, ty, hx, hy, TORSO_MOUNT_HALFW, parts.torso, white, fc);
+    // 躯干的铺开宽度**跟着素材的长宽比走**：素材改成侧身后，身体本来就窄（0.42~0.64），
+    // 若还按固定的 40 宽铺，侧身的身体会被横向拉成 1.4 倍（白骨精那种）。高度仍是 68
+    // （肩→髋的骨长加两端重叠），宽度 = 68 x 素材长宽比 => 素材不被拉伸。
+    const tAr = (parts.torso.right - parts.torso.left) / Math.max(1, parts.torso.bottom - parts.torso.top);
+    const tHalf = 34 * tAr;
+    drawBoneImg(ctx, tx, ty, hx, hy, tHalf, parts.torso, white, fc);
+    // 脖子画在躯干**之后**：头贴图的下缘是渐隐的脖子断面，若脖子被躯干盖住，
+    // 头与身体之间就断成两截（站姿都能看见）。颜色取**脸的肤色**（faceTone）：
+    // 脖子是脸的下半截延续，用别的颜色，下巴那块就会变色——看着像"脖子接错了"。
+    drawNeck(ctx, shX, shY, p.lean, fc, faceTone(parts?.head, build?.face, tc.neck), white, chinGap);
   } else if (white) {
     ctx.fillStyle = '#fff';
-    fillTapered(ctx, shX, shY, hipX, hipY, TORSO_W, true, TAPER, true, main); // 白闪时整体转白，跳过渐变与描边
+    fillTapered(ctx, shX, shY, hipX, hipY, TORSO_W / 2, (TORSO_W * TAPER) / 2, true, true, main); // 白闪时整体转白，跳过渐变与描边
   } else {
     const tg = ctx.createLinearGradient(0, shY, 0, hipY); // 竖向渐变：上端 main，下端压暗
     tg.addColorStop(0, main);
@@ -1133,8 +2059,11 @@ export function drawLimbs(
     ctx.fillStyle = tg;
     // 肩端粗、髋端细——武人是宽肩窄腰，不是宽臀窄肩的裙摆轮廓（taperedPath 的 x1,y1 是粗的
     // 那头，所以起点传肩不传髋）；TORSO_W 比头部直径 32 明显更宽，肩线撑得起头，不会显小孩
-    fillTapered(ctx, shX, shY, hipX, hipY, TORSO_W, false, TAPER, true, main);
+    fillTapered(ctx, shX, shY, hipX, hipY, TORSO_W / 2, (TORSO_W * TAPER) / 2, false, true, main);
   }
+
+  // 握杆的后手：压在兵器与身体之上。手在杆上，杆在手上——顺序就是"握住"这件事本身。
+  if (deferBackHand) drawHand(ctx, handB, backSkin, white, build?.hand);
 
   const { cx: headCx, cy: headCy, angle: baseHeadAngle } = headAnchor(shX, shY, p.lean, fc);
   const headAngle = baseHeadAngle + p.headTilt * fc; // 头相对躯干的额外偏转
@@ -1152,13 +2081,22 @@ export function drawLimbs(
     // 骨架是同一副，头就该是同一个大小。角色差异体现在脸怎么画、戴什么冠，不是头有多大。
     // 按颈部底边对齐这条保留：头素材多高都不会浮起来，脖子始终落在衣领上。
     const { img, top, bottom, left, right } = parts.head;
-    const scale = headScale(parts.head);
+    // 角色级头身比：build.face 是**量出来的脸框**（源像素 x,y,宽,高），build.head 是角色特质倍率。
+    // 归一化（headScale）只有**一条锚**：内容盒高就是头高——素材契约保证头填满画幅，
+    // 头高因此直接可归一；脸不再当尺子（按脸量的话，猴王那种小脸会被放大、小孩那种大脸
+    // 会被缩小，角色差异被抹平），脸只管横向挂点与下巴接缝（headMountDx / chinGapOf）。
+    const scale = headScaleVal;
     // 源矩形取内容包围盒，横纵都裁。原来横向取整幅 naturalWidth，再拿 contentDx 把刚
     // 包进来的留白手工减掉——一进一出，等价于直接裁。裁了之后内容天然居中，脸没画在
     // 正中也不会歪，那个补偿项从构造上就不需要了。
     const sw = Math.max(1, right - left);
     const sh = Math.max(1, bottom - top);
     const dw = sw * scale, dh = sh * scale;
+    // **按脸挂**：横向让脸心落在身体中轴上（见 headMountDx）。
+    // 装饰（飘带/翎羽/帽翅）全在左边，头贴图的下缘又是渐隐的衣领——
+    // 按整幅挂的话，脸被推出身体 2~10 像素，而下巴与脖子之间会露出一截背景
+    // （脖子要按 chinGapOf 多伸一截才够到下巴，见 drawNeck）。
+    const dx = headMountDx(parts.head, build?.face, scale);
     ctx.save();
     ctx.translate(headCx, headCy);
     ctx.rotate(headAngle); // 部分跟随 lean——顺序与 drawBoneImg 一致：先在世界系里转，
@@ -1166,8 +2104,8 @@ export function drawLimbs(
     // 只取 top..bottom 这段内容行（parts.ts 已裁掉上下透明留白），横向仍是整张图；
     // 目标矩形的**底边**贴在颈点上（headCy 即颈点），高度由素材自己的比例决定。
     // 白闪走 drawWhitePart：原来这层 source-atop 染的是整块画布，头会变成一块白方（同 drawBoneImg）
-    if (white) drawWhitePart(ctx, parts.head, left, top, sw, sh, -dw / 2, -dh, dw, dh);
-    else ctx.drawImage(img, left, top, sw, sh, -dw / 2, -dh, dw, dh);
+    if (white) drawWhitePart(ctx, parts.head, left, top, sw, sh, -dw / 2 - dx, -dh, dw, dh);
+    else ctx.drawImage(img, left, top, sw, sh, -dw / 2 - dx, -dh, dw, dh);
     ctx.restore();
   } else if (headless) {
     // 无头：断首之后以乳为目、以脐为口。不画头，改在躯干上画那三处——
@@ -1241,29 +2179,33 @@ export function drawLimbs(
     }
   }
 
-  j = seg(ctx, hipX, hipY, p.legF[0], THIGH, THIGH_W, fc, main, parts?.legF, white);
-  const ankF = seg(ctx, j[0], j[1], p.legF[0] - p.legF[1], SHIN, 11, fc, main, parts?.legF, white);
-  if (!parts?.legF) drawFoot(ctx, ankF, fc, main, white);
-  j = seg(ctx, shX, shY, p.armF[0], UPPER_ARM, 11, fc, sleeve, parts?.armF, white);
+  j = seg(ctx, hipX, hipY, p.legF[0], THIGH, rT[0], rT[1], fc, main, parts?.legFU ?? parts?.legF, white);
+  const ankF = seg(ctx, j[0], j[1], p.legF[0] - p.legF[1], SHIN, rS[0], rS[1], fc, main, parts?.legFL ?? parts?.legF, white);
+  if (!parts?.legF && !parts?.footF) drawFoot(ctx, ankF, fc, main, white);
+  j = seg(ctx, nshX, nshY, p.armF[0], UPPER_ARM, rU[0], rU[1], fc, skin, parts?.armFU ?? parts?.armF, white);
   const elbow = j;
-  j = seg(ctx, j[0], j[1], p.armF[0] + p.armF[1], LOWER_ARM, 9, fc, sleeve, parts?.armF, white);
-  if (parts?.weapon) { // 有贴图就用贴图
-    seg(ctx, j[0], j[1], p.armF[0] + p.armF[1], 34, 8, fc, main, parts.weapon, white);
-  } else if (weapon) { // 否则走程序化兵器：方向取前臂（肘→手）的实际朝向，不重算角度约定
-    drawWeapon(ctx, elbow, j, weapon, white, weaponScale, weaponGlow);
+  j = seg(ctx, j[0], j[1], p.armF[0] + p.armF[1], LOWER_ARM, rF[0], rF[1], fc, skin, parts?.armFL ?? parts?.armF, white);
+  // 装束画在两段之后：袖口要盖住小臂的根，护腕在小臂中段，毛边沿上臂
+  // 袖口是**衣服**的一截（铁扇的广袖、钟馗的官袍），用衣服色；护腕与毛边是手臂自己的东西，用皮肤色
+  if (!parts?.armF) {
+    drawSleeve(ctx, build?.sleeve,
+      { x1: nshX, y1: nshY, x2: elbow[0], y2: elbow[1] },
+      { x1: elbow[0], y1: elbow[1], x2: j[0], y2: j[1] },
+      awL, skin, white, tc.cloth);
   }
-  // 手压在兵器之上——顺序就是"握住"这件事本身
-  // 前手用 main，不用 sleeve。accent 是高光色，混半之后仍比身体亮一档，
-  // 在选人卡的尺寸上会成为腰腹上最显眼的一枚浅色贴纸——比脸还抢眼。
-  // 后手本来就是 main，两只手不同色也说不通。可读性靠描边和指缝，不靠亮度。
-  if (!parts?.armF) drawHand(ctx, j, main, white);
+  // 兵器已经画在躯干之前了（见上面那段），这里只剩手——手压在兵器之上，
+  // 顺序就是"握住"这件事本身
+  // 手是皮肤的一部分，跟手臂同色（此前用 main，是 accent 时代的老办法：accent 近白，
+  // 手若也用白就成了腰腹上最显眼的一枚浅色贴纸——现在手臂本身已是皮肤色，手跟着走就对上了）。
+  if (!parts?.armF && !parts?.handF) drawHand(ctx, j, skin, white, build?.hand);
 }
 
 /** 兵器握持点（前手末端）与朝向。抽出来是因为拖影也要用同一个点——
  * 两处各算一遍必然漂移。 */
-export function weaponHold(p: Pose, x: number, feetY: number, fc: number) {
+export function weaponHold(p: Pose, x: number, feetY: number, fc: number, build?: CharacterDef['build']) {
   const { shX, shY } = torsoAnchors(x, feetY, p.lean, p.crouch, fc);
-  const elbow = segEnd(shX, shY, p.armF[0], UPPER_ARM, fc);
+  const [nshX, nshY] = nearArmAnchor(shX, shY, fc, build?.shoulderDx, build?.shoulderDy);
+  const elbow = segEnd(nshX, nshY, p.armF[0], UPPER_ARM, fc);
   const hand = segEnd(elbow[0], elbow[1], p.armF[0] + p.armF[1], LOWER_ARM, fc);
   return { elbow, hand };
 }
@@ -1305,13 +2247,15 @@ export function weaponTipOf(p: Pose, x: number, feetY: number, fc: number, w: We
 export function drawWeapon(
   ctx: CanvasRenderingContext2D, elbow: [number, number], hand: [number, number],
   w0: WeaponDef, white: boolean, scale = 1, glow = 0,
+  /** 拉弦的那只手（弓用）：弦从两个弓弭汇到它上面，画成拉满的 V。别的形制不看这个参数。 */
+  pull?: [number, number],
 ) {
   const w = scale === 1 ? w0 : { ...w0, len: w0.len * scale };
   if (glow > 0) { // 大招期间刃身发光：叠一层同色的粗描边
     ctx.save();
     ctx.globalCompositeOperation = 'lighter';
     ctx.globalAlpha = Math.min(glow, 1) * 0.55;
-    drawWeapon(ctx, elbow, hand, { ...w, shaft: w.edge }, false, 1, 0);
+    drawWeapon(ctx, elbow, hand, { ...w, shaft: w.edge }, false, 1, 0, pull);
     ctx.restore();
   }
   const dx = hand[0] - elbow[0], dy = hand[1] - elbow[1];
@@ -1423,7 +2367,15 @@ export function drawWeapon(
     ctx.quadraticCurveTo(hand[0] + ux * 26, hand[1] + uy * 26, t2[0], t2[1]);
     ctx.stroke();
     ctx.strokeStyle = edge; ctx.lineWidth = 1.4;    // 弦
-    ctx.beginPath(); ctx.moveTo(t1[0], t1[1]); ctx.lineTo(t2[0], t2[1]); ctx.stroke();
+    ctx.beginPath();
+    if (pull) {
+      // 拉满的弓：弦不是一条直线，而是从两个弓弭汇到**拉弦的那只手**上。
+      // 此前弦直直穿过握点、另一只手垂在身侧，画出来是"拿着一把没拉开的弓"。
+      ctx.moveTo(t1[0], t1[1]); ctx.lineTo(pull[0], pull[1]); ctx.lineTo(t2[0], t2[1]);
+    } else {
+      ctx.moveTo(t1[0], t1[1]); ctx.lineTo(t2[0], t2[1]);
+    }
+    ctx.stroke();
     ctx.fillStyle = edge;                            // 两端弓弭
     for (const e of [t1, t2]) { ctx.beginPath(); ctx.arc(e[0], e[1], 3.2, 0, Math.PI * 2); ctx.fill(); }
     ctx.lineCap = 'butt';
@@ -1478,15 +2430,20 @@ export function drawPortrait(ctx: CanvasRenderingContext2D, def: CharacterDef, w
   ctx.save();
   ctx.translate(w / 2, h * 0.96);        // 原点落在脚底
   ctx.scale(s, s);
+  // 与对局同一套身高缩放（见 drawFighter 里 bodyScale 那段）：卡片上的人要与场上一样高矮，
+  // 否则选人页看着比实际矮一头。
+  const bodyScale = def.height / 150;
+  ctx.translate(0, 0);
+  ctx.scale(bodyScale, bodyScale);
   if (def.adorn?.wings) {
-    const a = torsoAnchors(0, 0, pose.lean, pose.crouch, 1);
-    drawWings(ctx, def.adorn.wings, a.shX, a.shY, 1, 0, 0);
+    const wa = shoulderAnchor(0, 0, pose.lean, pose.crouch, 1, def.build?.rig);
+    drawWings(ctx, def.adorn.wings, wa[0], wa[1], 1, 0, 0);
   }
   // 传 getParts 而不是 null：立绘刚做出来时还没有任何美术素材，当时写死 null 是对的；
   // 现在素材陆续补进来了，选人页却仍是火柴人——而那正是玩家第一眼看的地方。
   // 逐件挂载：有 head.png 就用，没有就回退程序化圆头（连带头饰），互不影响。
   drawLimbs(ctx, pose, 0, 0, 1, getParts(def.id), def.palette.main, def.palette.accent, false,
-    def.weapon, 1, 0, def.headless, def.crown);
+    def.weapon, 1, 0, def.headless, def.crown, def.build);
   ctx.restore();
 }
 
@@ -1578,8 +2535,10 @@ function drawFighter(ctx: CanvasRenderingContext2D, f: Fighter, x: number, y: nu
   const p: Pose = poseFor(f);
   const feetY = FLOOR_Y - y;
   const white = f.flash > 0;
-  const main = white ? '#fff' : f.def.palette.main;
-  const accent = white ? '#fff' : f.def.palette.accent;
+  // 环境光：角色的主色里掺一点本帧的光源色（天体色）。掺得很少（8~10%），读不出来是"染了色"，
+  // 只读得出"这盏光也照在他身上"——背景与角色各用各的色时，人物是浮在景上的贴纸
+  const main = white ? '#fff' : mixC(f.def.palette.main, sceneLight, 0.1);
+  const accent = white ? '#fff' : mixC(f.def.palette.accent, sceneLight, 0.06);
   const fc = f.facing;
   // 逐件挂载：parts 里存在哪个字段就用哪张图，缺的字段各自独立回退到笔锋/胶囊绘制
   // （见 drawLimbs 里每处 parts?.xxx 判断）；parts 本身可能是空对象——效果等同完全没有美术
@@ -1592,13 +2551,33 @@ function drawFighter(ctx: CanvasRenderingContext2D, f: Fighter, x: number, y: nu
   // 支点取臀部高度：绕脚底转会让人像绕着脚尖倒，绕重心转才像被打翻。
   // 倒地此前是对 down 状态写死的 -90°——既不能插值也只有一个角度；现在由 pose.roll 给，
   // fallen 动作因此能「转着倒下去」，tumble 能在空中真的翻整圈。
-  if (p.roll !== 0 || p.squash !== 1) {
+  // **受击形变**：被打中的那一瞬间，身体沿受力方向拉一下、另一轴压一下。
+  // 打击感里最容易被漏掉的一项：只有粒子与震屏时，角色像一张贴纸被推动；
+  // 有了这一下挤压拉伸，这一击才有"砸进去"的重量。
+  // 方向：水平受力就横向拉长（sq<1 → 横向撑开、纵向压扁）；被打飞起来则反过来。
+  const imp = f.impact > 0
+    ? (f.vy < -6 ? 1 + 0.16 * (f.impact / 4) : 1 - 0.2 * (f.impact / 4))
+    : 1;
+  const sq = p.squash * imp;
+  if (p.roll !== 0 || sq !== 1) {
     const pivotY = feetY - 40;
     ctx.translate(x, pivotY);
     if (p.roll !== 0) ctx.rotate(p.roll * fc);
-    if (p.squash !== 1) ctx.scale(1 / p.squash, p.squash); // 横向反向补偿，体积守恒
+    if (sq !== 1) ctx.scale(1 / sq, sq); // 横向反向补偿，体积守恒
     ctx.translate(-x, -pivotY);
   }
+  // **每个角色按自己的身高缩放**（def.height）。
+  //
+  // 为什么：十二个人**共用一副骨架**，画面上一直一样高——可数据里写的是各人各的身高
+  // （红孩儿 128、牛魔王 160、白骨精 146…），**投影的宽度与判定框的高度都按这份数据画**，
+  // 于是画面上会出现"投影比身体宽、判定框比身体矮"的不一致：红孩儿的头和肩膀根本在判定框外。
+  // 数据既然写了"谁多高谁多矮"，渲染就该照着画——红孩儿就该是个小孩，牛魔王就该压人。
+  // 缩放绕脚底（脚不能离地），美术贴图与程序化四肢一起缩放，比例关系不变。
+  // 基准 150：十二人数据的中位数附近，取这个值等于"大多数人的体型不变"。
+  const bodyScale = f.def.height / 150;
+  ctx.translate(x, feetY);
+  ctx.scale(bodyScale, bodyScale);
+  ctx.translate(-x, -feetY);
   // 兵器倍率取自当前招式；大招期间刃身发光，强度随判定窗口起落
   const mv = f.state === 'attack' ? f.move : null;
   const wScale = mv ? autoWeaponScale(f.def, mv) : 1;
@@ -1606,7 +2585,7 @@ function drawFighter(ctx: CanvasRenderingContext2D, f: Fighter, x: number, y: nu
     && f.stateFrame < mv.startup + mv.active ? 1 : 0;
   // 兵器已被打飞的一方，手上不再画兵器
   const held = isDisarmed(who) ? undefined : f.def.weapon;
-  drawLimbs(ctx, p, x, feetY, fc, parts, main, accent, white, held, wScale, wGlow, f.def.headless, f.def.crown);
+  drawLimbs(ctx, p, x, feetY, fc, parts, main, accent, white, held, wScale, wGlow, f.def.headless, f.def.crown, f.def.build);
 
   if (import.meta.env.DEV && hitboxDebug() && f.state === 'attack' && f.move) { // 判定帧命中框叠加层，直接取自 worldBox，与 checkHit 一致；生产构建裁掉
     const mv = f.move;
@@ -1634,9 +2613,18 @@ function drawFighter(ctx: CanvasRenderingContext2D, f: Fighter, x: number, y: nu
  * tickDamageTrail 的道理，采样间隔/淡出速度不能绑定渲染帧率，否则 120Hz 手机上残影堆得
  * 更密、淡得更快。用 Battle 引用探测新局，避免上一局的残影漏进下一局第一帧。
  */
-interface Ghost { x: number; y: number; pose: Pose; facing: 1 | -1; age: number }
-interface GhostState { battle: Battle | null; p1: Ghost[]; p2: Ghost[]; since1: number; since2: number }
-const ghostState: GhostState = { battle: null, p1: [], p2: [], since1: 0, since2: 0 };
+interface Ghost { x: number; y: number; pose: Pose; facing: 1 | -1; age: number; peak: number; life: number }
+interface GhostState {
+  battle: Battle | null;
+  p1: Ghost[]; p2: Ghost[];
+  since1: number; since2: number;
+  /** 普通招式的身形拖影。与超必杀那套分开存：两者的浓度、存活时间都不同 */
+  t1: Ghost[]; t2: Ghost[];
+  tsince1: number; tsince2: number;
+}
+const ghostState: GhostState = {
+  battle: null, p1: [], p2: [], since1: 0, since2: 0, t1: [], t2: [], tsince1: 0, tsince2: 0,
+};
 const GHOST_MAX = 4;
 const GHOST_SAMPLE_EVERY = 3; // 每 3 逻辑 tick 采样一次
 const GHOST_LIFE = 14;        // age 超过这个 tick 数就从队列移除（淡出全程）
@@ -1644,20 +2632,31 @@ const GHOST_ALPHA = 0.42;     // 最新一张残影的峰值透明度——Task 
 // 时间被 sp100 的暗场+背光盖住看不见（渲染顺序的问题，见下面 draw() 里补的那次重绘），调多高
 // 都没用。顺序修好之后再看，0.3 在暗场里仍偏淡，调到 0.42 才在正常观战距离下读得出来是拖尾
 
+/** 普通招式的身形拖影：浓度低、活得短。存在的意义是"他冲出去了"——三段连击的位移很快，
+ * 没有这道拖影时角色像瞬移。跟兵器拖影不冲突：一条是刃，一条是人。 */
+const TRAIL_GHOST_MAX = 3;
+const TRAIL_GHOST_LIFE = 7;
+const TRAIL_GHOST_ALPHA = 0.16;
+
 function resetGhostsIfNewBattle(b: Battle): void {
   if (ghostState.battle !== b) {
-    ghostState.battle = b; ghostState.p1 = []; ghostState.p2 = []; ghostState.since1 = 0; ghostState.since2 = 0;
+    ghostState.battle = b;
+    ghostState.p1 = []; ghostState.p2 = []; ghostState.since1 = 0; ghostState.since2 = 0;
+    ghostState.t1 = []; ghostState.t2 = []; ghostState.tsince1 = 0; ghostState.tsince2 = 0;
   }
 }
 
-function stepGhostList(list: Ghost[], since: number, f: Fighter): number {
-  const inWindow = f.state === 'attack' && f.move?.slot === 'sp100';
-  if (!inWindow) { list.length = 0; return 0; } // 出了 sp100 窗口立刻清空，不留尾巴
+function stepGhostList(
+  list: Ghost[], since: number, f: Fighter,
+  max: number, life: number, every: number, peak: number,
+  window: (f: Fighter) => boolean,
+): number {
+  if (!window(f)) { list.length = 0; return 0; } // 出了窗口立刻清空，不留尾巴
   for (const g of list) g.age++;
-  while (list.length && list[0].age > GHOST_LIFE) list.shift();
-  if (since + 1 >= GHOST_SAMPLE_EVERY) {
-    list.push({ x: f.x, y: f.y, pose: poseFor(f), facing: f.facing, age: 0 });
-    if (list.length > GHOST_MAX) list.shift();
+  while (list.length && list[0].age > life) list.shift();
+  if (since + 1 >= every) {
+    list.push({ x: f.x, y: f.y, pose: poseFor(f), facing: f.facing, age: 0, peak, life });
+    if (list.length > max) list.shift();
     return 0;
   }
   return since + 1;
@@ -1666,8 +2665,18 @@ function stepGhostList(list: Ghost[], since: number, f: Fighter): number {
 /** 每逻辑 tick 调一次，紧跟 battle.tick() 之后（同 tickDamageTrail 的调用位置）。 */
 export function tickAfterimages(b: Battle): void {
   resetGhostsIfNewBattle(b);
-  ghostState.since1 = stepGhostList(ghostState.p1, ghostState.since1, b.p1);
-  ghostState.since2 = stepGhostList(ghostState.p2, ghostState.since2, b.p2);
+  ghostState.since1 = stepGhostList(ghostState.p1, ghostState.since1, b.p1,
+    GHOST_MAX, GHOST_LIFE, GHOST_SAMPLE_EVERY, GHOST_ALPHA,
+    f => f.state === 'attack' && f.move?.slot === 'sp100');
+  ghostState.since2 = stepGhostList(ghostState.p2, ghostState.since2, b.p2,
+    GHOST_MAX, GHOST_LIFE, GHOST_SAMPLE_EVERY, GHOST_ALPHA,
+    f => f.state === 'attack' && f.move?.slot === 'sp100');
+  ghostState.tsince1 = stepGhostList(ghostState.t1, ghostState.tsince1, b.p1,
+    TRAIL_GHOST_MAX, TRAIL_GHOST_LIFE, GHOST_SAMPLE_EVERY, TRAIL_GHOST_ALPHA,
+    f => f.state === 'attack' && f.move?.slot !== 'sp100');
+  ghostState.tsince2 = stepGhostList(ghostState.t2, ghostState.tsince2, b.p2,
+    TRAIL_GHOST_MAX, TRAIL_GHOST_LIFE, GHOST_SAMPLE_EVERY, TRAIL_GHOST_ALPHA,
+    f => f.state === 'attack' && f.move?.slot !== 'sp100');
   stepWeaponTrail(weaponTrail.p1, b.p1);
   stepWeaponTrail(weaponTrail.p2, b.p2);
 }
@@ -1706,11 +2715,11 @@ function drawTrail(ctx: CanvasRenderingContext2D, list: TrailPt[], color: string
 }
 
 function drawGhost(ctx: CanvasRenderingContext2D, g: Ghost, def: CharacterDef) {
-  const alpha = GHOST_ALPHA * Math.max(0, 1 - g.age / GHOST_LIFE);
+  const alpha = g.peak * Math.max(0, 1 - g.age / g.life);
   if (alpha <= 0.01) return;
   ctx.save();
   ctx.globalAlpha = alpha;
-  drawLimbs(ctx, g.pose, g.x, FLOOR_Y - g.y, g.facing, getParts(def.id), def.palette.main, def.palette.accent, false, def.weapon, 1, 0, def.headless, def.crown);
+  drawLimbs(ctx, g.pose, g.x, FLOOR_Y - g.y, g.facing, getParts(def.id), def.palette.main, def.palette.accent, false, def.weapon, 1, 0, def.headless, def.crown, def.build);
   ctx.restore();
 }
 
@@ -1816,7 +2825,7 @@ const DANGER_PERIOD = 45;
 
 function healthBar(ctx: CanvasRenderingContext2D, x: number, flip: boolean, f: Fighter, trailFrac: number, frame: number) {
   const w = BAR_W, h = BAR_H, y = BAR_Y;
-  // 内容区：paper 极淡内衬 + ink 半透明槽底叠在上面——宣纸贴片压了墨线的底色
+  // 贴片：paper 极淡内衬 + ink 半透明槽底叠在上面——宣纸贴片压了墨线的底色
   ctx.fillStyle = hexAlpha(INK.paper, 0.12);
   ctx.fillRect(x + 2, y + 2, w - 4, h - 4);
   ctx.fillStyle = hexAlpha(INK.ink, 0.4);
@@ -1832,8 +2841,14 @@ function healthBar(ctx: CanvasRenderingContext2D, x: number, flip: boolean, f: F
   // 越过它对手就进入「凶暴」（攻击权重翻倍、逃跑权重砍到三成半）。
   // 光换个颜色的话，玩家看不出"从这一刻起对面会拼命"这件事已经发生了。
   const danger = hpFrac <= DESPERATE_HP;
-  ctx.fillStyle = danger ? INK.cinnab : INK.gamboge;
   const hpW = hpFrac * iw;
+  // 血条不是一根平涂的进度条：上缘提亮一档，下缘压深，读起来是一块有厚度的颜料
+  const hg = ctx.createLinearGradient(0, iy, 0, iy + ih);
+  const base = danger ? INK.cinnab : INK.gamboge;
+  hg.addColorStop(0, mixC(base, INK.paper, 0.3));
+  hg.addColorStop(0.55, base);
+  hg.addColorStop(1, mixC(base, INK.ink, 0.25));
+  ctx.fillStyle = hg;
   ctx.fillRect(flip ? ix + iw - hpW : ix, iy, hpW, ih);
   if (danger && hpFrac > 0) {
     // 搏动挂在**逻辑帧**上，不是渲染帧：这个项目在"按逻辑帧走的量"上栽过四次，
@@ -1843,9 +2858,26 @@ function healthBar(ctx: CanvasRenderingContext2D, x: number, flip: boolean, f: F
     ctx.fillRect(flip ? ix + iw - hpW : ix, iy, hpW, ih);
   }
 
+  // 外框：墨线一整圈，底下垫一层投影——血条压在天空上，没有投影就与背景糊在一起
+  ctx.save();
+  ctx.shadowColor = 'rgba(4,8,14,.55)';
+  ctx.shadowBlur = 8;
+  ctx.shadowOffsetY = 2;
   ctx.strokeStyle = INK.ink;
   ctx.lineWidth = 2;
   ctx.strokeRect(x, y, w, h);
+  ctx.restore();
+  // 内框：印章那道内缩一圈的细边。血条因此读成"一枚横躺的印章"，而不是一根进度条
+  ctx.strokeStyle = hexAlpha(INK.paper, 0.18);
+  ctx.lineWidth = 1;
+  ctx.strokeRect(x + 4.5, y + 4.5, w - 9, h - 9);
+  // 四分刻度：血量读数靠条的长度，但"还剩多少"要能一眼估出来，刻度给的是比例。
+  // 压得很淡——刻度一旦读成分段，血量条就变成"还剩几格"，那是另一套读法
+  ctx.strokeStyle = hexAlpha(INK.ink, 0.16);
+  for (let i = 1; i < 4; i++) {
+    const tx = ix + iw * (i / 4);
+    ctx.beginPath(); ctx.moveTo(tx, iy + 1); ctx.lineTo(tx, iy + ih - 1); ctx.stroke();
+  }
 
   // 角色名：血条外侧，p1 右对齐贴左端外，p2 左对齐贴右端外；描边加深底色，避免撞上浅色天空。
   // save/restore 包住文字状态（font/baseline/align/描边宽度全在内）——比逐个手动复位更不容易漏
@@ -1884,12 +2916,20 @@ function meterBar(ctx: CanvasRenderingContext2D, x: number, flip: boolean, meter
     } else {
       ctx.fillStyle = hexAlpha(INK.ink, 0.4);
       ctx.fillRect(sx, y, segW, h);
-      ctx.fillStyle = INK.azurite;
+      // 石青不是平涂：上缘提亮一档，跟血条同一套"颜料有厚度"的画法
+      const mg = ctx.createLinearGradient(0, y, 0, y + h);
+      mg.addColorStop(0, mixC(INK.azurite, INK.paper, 0.28));
+      mg.addColorStop(1, mixC(INK.azurite, INK.ink, 0.2));
+      ctx.fillStyle = mg;
       ctx.fillRect(sx, y, segW * (charge / 50), h);
       ctx.strokeStyle = hexAlpha(INK.ink, 0.8);
       ctx.lineWidth = 1.5;
       ctx.strokeRect(sx, y, segW, h);
     }
+    // 内框：与血条同一道印章细边，两行 HUD 读起来是一套东西
+    ctx.strokeStyle = hexAlpha(INK.paper, 0.16);
+    ctx.lineWidth = 1;
+    ctx.strokeRect(sx + 2.5, y + 2.5, segW - 5, h - 5);
   }
 }
 

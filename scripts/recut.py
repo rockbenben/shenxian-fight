@@ -24,7 +24,12 @@ def is_magenta(r, g, b):
     return r > 110 and b > 110 and g < min(r, b) * 0.72
 
 
-def recut(raw_path, out_path, size):
+def recut(raw_path, out_path, size, flip=False):
+    """切出部件。flip=True 时把裁好的内容**水平镜像**。
+
+    什么时候需要：素材出图的朝向与约定相反时，镜像一次比重出省一次额度。
+    只在"内容整体朝反"时用（躯干转身、配件在另一边），不是用来修小瑕疵的。
+    """
     im = Image.open(raw_path).convert('RGBA')
     px = im.load()
     W, H = im.size
@@ -91,6 +96,8 @@ def recut(raw_path, out_path, size):
     else:           # 头：不参与骨长反推，维持原来最紧的那档
         box = cands[0]
     im = im.crop(box)
+    if flip:
+        im = im.transpose(Image.FLIP_LEFT_RIGHT)
     # ④ 铺满目标框（留 4px 边），不再有"内容缩成一小团"
     Wt, Ht = size
     # 这里曾经有个 fill = 0.80：躯干**不许铺满框**，因为渲染层拿躯干内容宽反推头的缩放，

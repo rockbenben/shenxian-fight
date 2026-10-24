@@ -60,6 +60,14 @@ export const WUKONG: CharacterDef = {
   endingHard: '花果山的猴子们等着他讲这一趟。他讲到一半就睡着了——天大的事，说起来也不过一觉的工夫。',
   role: '均衡 · 全能', id: 'wukong', name: '孙悟空', hp: 200, speed: 5.1, jumpVel: 18,
   width: 54, height: 150, palette: { main: '#c9862b', accent: '#ffe8b0' },
+  // 体型：四肢粗细 / 手形 / 装束。猴王：手臂有毛、末端是爪——这两样一上，"人样"就散了。
+  // 此前十二个人共用同一套四肢几何（同样粗、同样一颗圆手），只有颜色不同——
+  // 于是十二个人看着像同一副假人换了个色。
+  // 头身比：头贴图按素材契约重出（金箍+金鬃毛，猴脸完整露出），内容框 103×124、
+  // 脸 39×43（源像素，量的——工具见 scripts/measure-heads.py）。
+  // 脸比哪吒小是**角色设计**（猴王脸小、小孩脸大），不该靠缩放抹平；
+  // 归一只有一条锚：内容盒高就是头高，脸只管横向挂点与下巴接缝。
+  build: { rig: { k: 0.22, chinY: 120.1, shoulderY: 112.4, hipY: 43.12, shoulderDx: -23.06, backShoulderDx: 14.96, headDx: -0.044, legFDx: 3.96, legBDx: -14.96, footAnchorX: 0.2955, face: [73, 68, 83, 86], upperArm: 27.72, lowerArm: 18.48, handLen: 16.94, thigh: 11.88, shin: 12.1, torsoLen: 77 }, shoulderDx: -13.4, shoulderDy: 3.1, arm: 1.05, leg: 1.05, hand: 'claw', sleeve: 'fur', face: [71, 56, 39, 43], head: 1.0 },
   weapon: { kind: 'staff', len: 118, grip: 0.5, shaft: '#c9862b', edge: '#ffd23f' }, // 如意金箍棒
   adorn: {
     // 虎皮裙的两条系带 + 筋斗云的余絮

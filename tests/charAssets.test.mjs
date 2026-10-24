@@ -14,6 +14,9 @@ import path from 'node:path';
 // 会被完全无视——没有 404、没有报错、画面上照旧是程序化的胳膊，加素材的人得不到任何反馈。
 test('public/chars 里的每个文件都在探测列表内，且命名合规', () => {
   const PROBED = ['head', 'torso'];          // 与 src/render/parts.ts 的 NAMES 一致
+  // 纸偶件那一套（整人一张画切出来的），放在 chars/<id>/doll/ 下，
+  // 与 src/render/parts.ts 的 DOLL_NAMES 一致
+  const DOLL_PROBED = ['head', 'torso', 'armFU', 'armFL', 'handF', 'legFU', 'legFL', 'footF'];
   const root = 'public/chars';
   expect(fs.existsSync(root), 'public/chars 不见了').toBe(true);
 
@@ -23,6 +26,20 @@ test('public/chars 里的每个文件都在探测列表内，且命名合规', (
     if (!fs.statSync(dir).isDirectory()) { stray.push(`${id} 不是目录`); continue; }
     if (!/^[a-z]+$/.test(id)) stray.push(`${dir} 目录名不是全小写字母（渲染层按 def.id 拼路径）`);
     for (const f of fs.readdirSync(dir)) {
+      // 纸偶件那一套在自己的子目录里：chars/<id>/parts/<部件名>.png
+      if (f === 'parts') {
+        const ddir = path.join(dir, f);
+        if (!fs.statSync(ddir).isDirectory()) { stray.push(`${ddir} 不是目录`); continue; }
+        for (const df of fs.readdirSync(ddir)) {
+          const dm = /^([a-zA-Z]+)\.png$/.exec(df);
+          if (!dm) { stray.push(`${ddir}/${df} 不是 <部件名>.png`); continue; }
+          if (!DOLL_PROBED.includes(dm[1])) {
+            stray.push(`${ddir}/${df} 的部件名不在纸偶探测列表 [${DOLL_PROBED}] 内——`
+              + '它永远不会被加载，要么改名，要么把这个名字加回 src/render/parts.ts 的 DOLL_NAMES');
+          }
+        }
+        continue;
+      }
       const m = /^([a-zA-Z]+)\.png$/.exec(f);
       if (!m) { stray.push(`${dir}/${f} 不是 <部件名>.png`); continue; }
       if (!PROBED.includes(m[1])) {
