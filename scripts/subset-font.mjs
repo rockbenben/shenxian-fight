@@ -65,10 +65,34 @@ function verifyChecksum(file, expectedSha256) {
   }
 }
 
+/**
+ * 找一个**装了 fontTools** 的 python。
+ *
+ * 为什么不能直接用 `python`：PATH 上那个 python 可能换过（本机就换成了没装
+ * fontTools 的 3.15），而 fontTools 是**构建期**依赖、不是运行时依赖——装在哪个
+ * 解释器里全凭各人自己。构建跑到一半才炸（"子集覆盖率核实失败"）会把人引到
+ * "字体缺字"上去找原因，其实只是解释器选错了。
+ */
+function findPython() {
+  // 候选从"最可能对"排到"最可能错"：PATH 上的 python/python3；Windows 的启动器
+  // 带版本号（`py -3.14` 之类，只装了一个版本时 `py` 就够）。
+  const cands = [
+    ['python'], ['python3'],
+    ['py'], ['py', '-3.14'], ['py', '-3.13'], ['py', '-3.12'], ['py', '-3.11'], ['py', '-3.10'],
+  ];
+  for (const [c, ...rest] of cands) {
+    const probe = spawnSync(c, [...rest, '-c', 'import fontTools'], { stdio: 'ignore' });
+    if (!probe.error && probe.status === 0) return [c, ...rest];
+  }
+  return null;
+}
+
+let PY = null;
+
 function runPyftsubset(args) {
   let r = spawnSync('pyftsubset', args, { stdio: 'inherit' });
   if (r.error && r.error.code === 'ENOENT') {
-    r = spawnSync('python', ['-m', 'fontTools.subset', ...args], { stdio: 'inherit' });
+    r = spawnSync(PY[0], [...PY.slice(1), '-m', 'fontTools.subset', ...args], { stdio: 'inherit' });
   }
   if (r.status !== 0) throw new Error('pyftsubset 执行失败（见上方输出）');
 }
@@ -92,7 +116,7 @@ if missing:
     sys.exit(1)
 print(f'OK glyphs-checked={len(set(text))}')
 `;
-  const r = spawnSync('python', ['-c', py, woff2Path, CHARS_FILE], { encoding: 'utf8' });
+  const r = spawnSync(PY[0], [...PY.slice(1), '-c', py, woff2Path, CHARS_FILE], { encoding: 'utf8' });
   if (r.status !== 0) {
     console.error(r.stdout, r.stderr);
     throw new Error('子集覆盖率核实失败：产物缺字，见上方 MISSING 列表');
@@ -101,6 +125,14 @@ print(f'OK glyphs-checked={len(set(text))}')
 }
 
 async function main() {
+  PY = findPython();
+  if (!PY) {
+    throw new Error(
+      '找不到装了 fontTools 的 python（构建期依赖，不是运行时依赖）。\n' +
+      '装一个：python -m pip install fonttools brotli\n' +
+      '（PATH 上的 python 可能换过；这台机器上就换成了没装 fontTools 的那个。）',
+    );
+  }
   const naive = extractNaiveChars();
   const rendered = extractRenderedChars();
   console.log(`naive（整个 src/，含注释）唯一字符数: ${naive.size}`);
