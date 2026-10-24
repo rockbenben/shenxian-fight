@@ -1,8 +1,11 @@
 export type PartName =
   | 'head' | 'torso'
   // 纸偶件（整人一张画、在关节处切出来）：每一段各一张。
-  // 远侧（背向镜头的那条）复用近侧的图——它多半被身体挡着，单独切一套只是多一倍请求。
+  // 远侧（背向镜头的那条）多数角色被身体挡着，复用近侧的图；
+  // 画里**两条胳膊都画全了**的那几个角色（牛魔王、二郎、红孩儿、雷震子、刑天）
+  // 有自己的一套远臂件——那一条在画里是有形状的，拿近臂的图顶替会变成一块板子。
   | 'armFU' | 'armFL' | 'handF' | 'legFU' | 'legFL' | 'footF'
+  | 'armBU' | 'armBL' | 'handB'
   // 旧的一套（整条肢体一张图）：留着是为了老素材还能用，也为了纸偶件没到位时能回退
   | 'armF' | 'armB' | 'legF' | 'legB' | 'weapon';
 
@@ -43,6 +46,13 @@ export type PartImages = Partial<Record<PartName, PartImage>> & {
 export const DOLL_NAMES: PartName[] = [
   'head', 'torso', 'armFU', 'armFL', 'handF', 'legFU', 'legFL', 'footF',
 ];
+
+/** 远臂那一套（只有画里两条胳膊都画全了的角色才有）。
+ *
+ * 为什么不并进 DOLL_NAMES：其余七个角色没有这三个文件，
+ * 照单全探就是每个角色三个必然 404——选人页把十二个人全预载一遍，三十六个白跑的请求。
+ * 按角色有没有（rig.backArm）来探，没有的一个都不探。 */
+export const DOLL_BACK_NAMES: PartName[] = ['armBU', 'armBL', 'handB'];
 
 /**
  * 纸偶模式开关：`?doll=1`，或用 setDollMode 显式打开（测试与探针用）。
@@ -146,7 +156,7 @@ function verticalBounds(img: HTMLImageElement): BBounds {
 /** 逐件独立探测：谁加载成功就设那个字段,缺的部件字段直接不存在（不会写成 null 占位）——
  * 调用方（renderer.ts 的 seg()/头/躯干绘制）靠 `parts?.xxx` 判断存在与否,逐件回退到笔锋/
  * 胶囊绘制。目录整个不存在时 7 个请求全部 onerror,返回空对象,效果等同"整体回退"。 */
-export async function loadParts(charId: string): Promise<PartImages> {
+export async function loadParts(charId: string, backArm = false): Promise<PartImages> {
   // 必须走 BASE_URL，不能写死开头那个 /：base 是 './'（见 vite.config.ts——同一份产物
   // 既挂根域又挂 GitHub Pages 子路径），拼出来是 './chars/...'，两种前缀下都成立。
   // vite 只重写 index.html 里的引用，**运行时拼出来的字符串它一概不管**，
@@ -161,9 +171,10 @@ export async function loadParts(charId: string): Promise<PartImages> {
   // 纸偶件：整人一张画切出来的那一套。只在 ?doll=1 时探测——
   // 平时不付这 8 个请求（旧管线用不上它们）。
   if (dollModeOn()) {
-    const dimgs = await Promise.all(DOLL_NAMES.map(n => loadImg(`${import.meta.env.BASE_URL}chars/${charId}/parts/${n}.png`)));
+    const names = backArm ? [...DOLL_NAMES, ...DOLL_BACK_NAMES] : DOLL_NAMES;
+    const dimgs = await Promise.all(names.map(n => loadImg(`${import.meta.env.BASE_URL}chars/${charId}/parts/${n}.png`)));
     const doll: DollParts = {};
-    DOLL_NAMES.forEach((n, i) => {
+    names.forEach((n, i) => {
       const img = dimgs[i];
       if (img) { const { top, bottom, left, right } = verticalBounds(img); doll[n] = { img, top, bottom, left, right }; }
     });

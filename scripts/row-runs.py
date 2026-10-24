@@ -14,23 +14,14 @@ import os
 import sys
 
 import numpy as np
+import importlib.util as _ilu
+_cs = _ilu.spec_from_file_location('cf', os.path.join(os.path.dirname(os.path.abspath(__file__)), 'cut-fullbody.py'))
+_cf = _ilu.module_from_spec(_cs); _cs.loader.exec_module(_cf)
+load_clean = _cf.load_clean
 from PIL import Image
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SPEC_PATH = os.path.join(ROOT, 'scripts', 'fullbody-spec.json')
-
-
-def load_clean(path):
-    im = Image.open(path).convert('RGBA')
-    px = im.load()
-    W, H = im.size
-    for y in range(H):
-        for x in range(W):
-            r, g, b, a = px[x, y]
-            if a > 0 and r > 110 and b > 110 and g < min(r, b) * 0.72:
-                px[x, y] = (0, 0, 0, 0)
-    bb = im.getbbox()
-    return im.crop(bb) if bb else im
 
 
 def runs_of(row):

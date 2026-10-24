@@ -203,6 +203,11 @@ export interface CharacterRig {
   shoulderDx: number;
   /** 后肩相对身体中轴的横向偏移（正 = 画面右，背向镜头那一侧） */
   backShoulderDx: number;
+  /** 这个角色有没有**单独切出来的远臂**（画里两条胳膊都画全了的那些）。
+   *
+   * 为什么要单独标：远臂件（armBU/armBL/handB）只有这几个角色有，
+   * 其余角色去探就是必然 404——选人页把十二个人全预载一遍，三个 404 一人就是三十六个白跑的请求。 */
+  backArm?: boolean;
   /** 头件裁剪框中心相对身体中轴的横向偏移（逻辑单位）。
    *
    * 为什么不用「脸心对齐中轴」那条老规矩：那条规矩是给**单独画的肖像**准备的
@@ -224,6 +229,13 @@ export interface CharacterRig {
   thigh: number;
   shin: number;
   torsoLen: number;
+  /** 关节重叠（逻辑单位）：切件在下一个关节往下多留的那一截。
+   *
+   * 为什么需要：姿势里肘弯 29°、膝弯 40°，而画里胳膊是直的——两块各自绕自己的骨转，
+   * 接缝处会裂开一道楔形的空（画面上是一块背景色的三角）。多画这一截正好补住它，
+   * 而画出来的高度仍等于贴图自然高度（贴图不会被抻，1:1 仍成立）。 */
+  armOv?: number;
+  legOv?: number;
 }
 
 export interface CharacterDef {

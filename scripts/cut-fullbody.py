@@ -49,13 +49,19 @@ def is_magenta(r, g, b):
 
 
 def load_clean(path, max_h=700):
-    """读原图，抠掉品红底，裁到内容框；**并把高度压到 max_h**。
+    """读原图，抠掉背景，裁到内容框；**并把高度压到 max_h**。
 
     为什么压：原图是 2K（1696×2528），切出来的躯干那一块能有 1000 多像素高。
     角色在屏幕上只有 ~154 逻辑单位高（dpr 2 也就 300 多像素），按原分辨率切，
     十一个人全套就是 16MB 的 PNG—— precache 进去每个玩家白下载。
     压到 700 高（约为屏幕的 2.3 倍）画质绰绰有余，体积降到 1/13。
+
+    背景怎么抠：**删掉与画面边缘相连的连通域**，而不是按颜色判。
+    牛魔王那张的背景是带噪点的深品红（#B72F71 一带），按颜色判会漏下一片噪点，
+    噪点把「手臂与身体之间那道缝」糊住——于是手臂和身体在像素上又连成了一段，
+    切线就分不开了（实测他的手臂块怎么切都带着一条躯干）。按连通域删背景与颜色无关。
     """
+    from scipy import ndimage
     im = Image.open(path).convert('RGBA')
     px = im.load()
     W, H = im.size
@@ -64,8 +70,31 @@ def load_clean(path, max_h=700):
             r, g, b, a = px[x, y]
             if a > 0 and is_magenta(r, g, b):
                 px[x, y] = (0, 0, 0, 0)
-    bb = im.getbbox()
-    im = im.crop(bb) if bb else im
+    alpha = np.array(im.getchannel('A'))
+    # 内容框**仍按抠掉品红之后的 alpha 算**（规格表里的百分比是相对这个框量的，
+    # 换了框整套百分比就错位了）。去噪点只改 alpha，不动框。
+    solid = alpha > 8
+    ys, xs = np.where(solid)
+    if len(ys):
+        bb = (int(xs.min()), int(ys.min()), int(xs.max()) + 1, int(ys.max()) + 1)
+    else:
+        bb = (0, 0, W, H)
+    # 去噪点：与画面边缘相连的是背景；零星的小块是背景的飞点。两者都删。
+    lab, n = ndimage.label(solid, structure=np.ones((3, 3)))
+    if n:
+        border = set(lab[0, :].tolist()) | set(lab[-1, :].tolist()) | \
+            set(lab[:, 0].tolist()) | set(lab[:, -1].tolist())
+        border.discard(0)
+        keep = np.ones_like(lab, dtype=bool)
+        for b in border:
+            keep &= lab != b
+        sizes = np.bincount(lab.ravel())
+        for lbl in range(1, n + 1):
+            if lbl not in border and sizes[lbl] < 60:   # 飞点
+                keep &= lab != lbl
+        alpha = np.where(keep, alpha, 0)
+        im.putalpha(Image.fromarray(alpha))
+    im = im.crop(bb)
     if im.size[1] > max_h:
         sc = max_h / im.size[1]
         im = im.resize((max(1, int(im.size[0] * sc)), max_h), Image.LANCZOS)
@@ -299,14 +328,14 @@ def cut_one(cid, spec, verbose=True):
                     if a <= axis_px <= b:
                         body_i = i
                         break
-                cand = None
+                # 找不到躯干段的行**整行跳过**（那是头部/角/装饰的行）。
+                # 早先退化到"取最左边那一段"，于是牛魔王那两根角被当成了手臂，
+                # 手臂块只剩一条角（2.9 单位宽），后臂挂上去就是一条悬着的板子。
                 if body_i is not None and body_i > 0:
                     cand = rs[body_i - 1]
-                elif body_i is None:
-                    cand = rs[0]
-                if cand and (cand[1] - cand[0]) <= W * 0.35:
-                    los.append(cand[0])
-                    his.append(cand[1])
+                    if (cand[1] - cand[0]) <= W * 0.35:
+                        los.append(cand[0])
+                        his.append(cand[1])
             y += max(1, int(H * 0.004))
         if not los:
             return fallback
@@ -321,6 +350,17 @@ def cut_one(cid, spec, verbose=True):
     # 平口。渲染层会把多出来的这一截往上伸（见 renderer 的 drawDollLimbs），
     # 所以块的自然长度比骨段长，骨段长度仍按解剖量（肩关节→肘）。
     arm_segs[0] = ('armFU', spec['shoulder'] - 3, spec['elbow'], arm_segs[0][3])
+    # 关节重叠：每一段在**下一个关节往下**多留一截。
+    #
+    # 为什么需要：画里胳膊是直的，姿势里肘要弯 29°，两块各自绕自己的骨转，
+    # 接缝处就裂开一道楔形的空（画面上是一块背景色的三角，牛魔王那条最明显）。
+    # 多留的这一截在渲染时与骨段**同步变长**（画出来的高度 = 贴图自然高度），
+    # 所以贴图不会被抻；后画的那一段会盖住重叠部分，露出来的正好是那道楔形的空。
+    # 重叠量取肢体宽度的四分之一——楔形的深度 ≈ 半宽 × sin(弯角)。
+    arm_w_px = X(spec.get('armFU', spec['arm'])[1]) - X(spec.get('armFU', spec['arm'])[0])
+    arm_ov = 0.25 * arm_w_px / H * 100          # 占画幅高的百分比
+    leg_w_px = X(spec['leg'][1]) - X(spec['leg'][0])
+    leg_ov = 0.25 * leg_w_px / H * 100
     arm_mask = None
     arm_mode = spec.get('armMask', False)
     if arm_mode:
@@ -354,29 +394,81 @@ def cut_one(cid, spec, verbose=True):
                 ax1 = min(W, xs.max() + 2) / W * 100
                 arm_segs = [(n, y0, y1, [ax0, ax1]) for n, y0, y1, _ in arm_segs]
     pieces = {}
+    # 每一段在下一个关节往下多留 arm_ov（关节重叠，见上面的说明）
+    arm_ends = {'armFU': spec['elbow'] + arm_ov, 'armFL': spec['wrist'] + arm_ov}
     for name, y0, y1, xr in arm_segs:
+        # 横向范围仍按**原来那一段**量（重叠那截在关节之下，不参与测量）
         if not spec.get('armOverride'):
             xr = arm_x_range(y0, y1, xr)
+        by1 = min(H, int(round(H * arm_ends.get(name, y1) / 100)))
         # 裁切框与掩码切片必须用同一组整数，否则差一像素（掩码对不上，apply_mask 直接抛）
         bx0 = max(0, int(round(W * xr[0] / 100)))
         by0 = max(0, int(round(H * y0 / 100)))
         bx1 = min(W, int(round(W * xr[1] / 100)))
-        by1 = min(H, int(round(H * y1 / 100)))
         piece = im.crop((bx0, by0, max(bx0 + 1, bx1), max(by0 + 1, by1)))
         if arm_mask is not None:
             piece = apply_mask(piece, arm_mask[by0:by1, bx0:bx1])
         pieces[name] = piece
 
+    # ---- 远侧手臂（画面右那条）：单独切一套 ---------------------------------
+    # 为什么单独切：正面站着的角色画里**两条胳膊都画全了**（牛魔王、二郎、红孩儿、
+    # 雷震子、刑天），远臂有完整的肘、腕、手。它不能烤进躯干——躯干切线一刀下去，
+    # 远臂就只剩一条竖边（牛魔王那张右侧就是这么变成一块悬着的板子的）；
+    # 也不能拿近臂的图顶替——那是另一条胳膊，画里形状不一样（远臂是斜着垂下的）。
+    #
+    # 远臂画在躯干**后面**，所以切件里带进来的躯干像素会被躯干盖住，看不见；
+    # 切宽一点不要紧，切窄了远臂就会被切掉一块。
+    #
+    # 横向范围逐段写在规格表里（armB：三段的 [x0,x1]）——远臂是斜着垂下的，
+    # 三段的横向范围不一样：上臂那段的三角肌还压在躯干边上（前臂那段已经分开了）。
+    # 一段范围套三段也行（远臂几乎是竖的），但那三个人就切不出手来。
+    if 'armB' in spec:
+        bands = spec['armB']
+        if len(bands) == 2 and all(isinstance(v, (int, float)) for v in bands):
+            bands = [bands, bands, bands]
+
+        def band_x(i):
+            return bands[i] if i < len(bands) else bands[-1]
+
+        bsegs = [('armBU', spec['shoulder'] - 3, spec['elbow'] + arm_ov, band_x(0)),
+                 ('armBL', spec['elbow'], spec['wrist'] + arm_ov, band_x(1)),
+                 ('handB', spec['wrist'], spec['handEnd'], band_x(2))]
+        for name, y0, y1, xr in bsegs:
+            pieces[name] = crop_pct(im, xr[0], y0, xr[1], y1)
+
     # ---- 头 / 躯干 / 腿 / 脚 ------------------------------------------------
     pieces['head'] = crop_pct(im, spec['head'][0], spec['head'][1], spec['head'][2], spec['head'][3])
+    # 头件的底带：有些角色（牛魔王）**肩膀长到耳朵边上**，头件切矩形会带进一块肩甲，
+    # 画出来就是脖子左边挂着一块方板。规格表里写 headKeep（那一带保留的横向范围）与
+    # headKeepFrom（从哪一行往下开始裁），把肩膀切掉；没写就整块保留。
+    if 'headKeep' in spec:
+        hx0, hx1 = spec['headKeep']
+        hw = pieces['head'].size[0]
+        hh = pieces['head'].size[1]
+        span = spec['head'][2] - spec['head'][0]
+        kx0 = int(round(hw * (hx0 - spec['head'][0]) / span))
+        kx1 = int(round(hw * (hx1 - spec['head'][0]) / span))
+        ky = int(round(hh * (spec.get('headKeepFrom', spec['chin']) - spec['head'][1])
+                       / (spec['head'][3] - spec['head'][1])))
+        arr = np.array(pieces['head'].getchannel('A'))
+        arr[max(0, ky):, :max(0, kx0)] = 0
+        arr[max(0, ky):, min(arr.shape[1], kx1):] = 0
+        pieces['head'].putalpha(Image.fromarray(arr))
     pieces['torso'] = crop_pct(im, spec['torso'][0], spec['chin'], spec['torso'][1], spec['hip'])
-    pieces['legFU'] = crop_pct(im, spec['leg'][0], spec['hip'], spec['leg'][1], spec['knee'])
-    pieces['legFL'] = crop_pct(im, spec['leg'][0], spec['knee'], spec['leg'][1], spec['ankle'])
+    # 腿同样留关节重叠：膝盖弯起来时两块之间也会裂开一道缝（姿势里膝弯 40°）。
+    # 脚那一块不往上留——脚的贴图是**以踝为锚**画的（见 renderer 的 drawDollFoot），
+    # 往上留会让整只脚沉到地里去；踝那里本来几乎不弯（差 8°），缝本来就看不见。
+    pieces['legFU'] = crop_pct(im, spec['leg'][0], spec['hip'], spec['leg'][1], spec['knee'] + leg_ov)
+    pieces['legFL'] = crop_pct(im, spec['leg'][0], spec['knee'], spec['leg'][1], spec['ankle'] + leg_ov)
     pieces['footF'] = crop_pct(im, spec['foot'][0], spec['ankle'], spec['foot'][1], 100)
 
     # ---- 存盘 + 量尺寸 -----------------------------------------------------
     k = FIG_H / H          # 画里 1 像素 = 多少逻辑单位
     rig = {'k': k, 'srcH': H, 'srcW': W}
+    # 这个角色有没有单独切出来的远臂（画里两条胳膊都画全了的那些）。
+    # 渲染层据此决定要不要多探三个远臂件——不探就是必然 404。
+    if 'armB' in spec:
+        rig['backArm'] = True
     for name, piece in pieces.items():
         piece.save(os.path.join(outdir, f'{name}.png'))
         tb = trim_box(piece)
@@ -395,10 +487,18 @@ def cut_one(cid, spec, verbose=True):
 
     # 两条腿各自的横向偏移（相对身体中轴）。画里两条腿是岔开的，
     # 而骨架的两条腿都从同一个髋点出发——不给偏移就会并到中轴上。
-    leg_x = []
-    knee_y = int(Y(spec['knee']))
-    for a, b in substantial_runs(alpha[knee_y], W, 0.02):
-        leg_x.append((a + b) / 2)
+    #
+    # **在踝行量，不在膝行量**：袍子人物画里膝盖以下还是一整片袍子，膝行根本分不出
+    # 两条腿。实测牛魔王在膝行量到的第二段是**近侧手臂的手指**（袍子把腿整个挡住了），
+    # 后腿因此偏了 26.9 单位，实际只该偏 12；铁扇公主膝行只有一段，两条腿的偏移双双
+    # 成了 0（画里两条腿明明岔着）。踝行往下是腿最细的地方，袍子已经让开了。
+    def leg_centers(pct):
+        y = min(H - 1, max(0, int(Y(pct))))
+        return [(a + b) / 2 for a, b in substantial_runs(alpha[y], W, 0.02)]
+
+    leg_x = leg_centers(spec['ankle'])
+    if len(leg_x) != 2:
+        leg_x = leg_centers(spec['knee'])    # 兜底：还是按膝行量（老做法）
     if len(leg_x) >= 2:
         rig['legFDx'] = (max(leg_x) - axis_px) * k     # 画面右边那条是前腿
         rig['legBDx'] = (min(leg_x) - axis_px) * k
@@ -414,10 +514,28 @@ def cut_one(cid, spec, verbose=True):
     cols = np.where((a > 10).any(axis=0))[0]
     arm_x0 = spec.get('armFU', spec['arm'])[0]
     shoulder_px = X(arm_x0) + ((cols.min() + cols.max()) / 2 if len(cols) else 0)
-    # 后肩：肩线那一行最右边一段的右缘
-    sh_row = alpha[int(Y(spec['shoulder']))]
-    rs = substantial_runs(sh_row, W, 0.03)
-    back_px = rs[-1][1] if rs else axis_px
+    # 后肩：挂在**躯干右缘往里半个臂宽**的地方。
+    #
+    # 为什么：后臂是**藏在身体后面**的，它的挂点要让后臂大半个身子被躯干盖住
+    # （旧管线那条程序化后臂就是这么藏的）。直接用后臂的外缘当挂点，后臂整个挂到
+    # 身体外面去——画面上就是一条悬在体侧的手臂板子（牛魔王那张最明显）。
+    # 半个臂宽从**躯干裁切框的右缘**往里退：那条缘就是后臂的内缘（躯干裁到那儿为止）。
+    #
+    # 但画里**远臂单独画出来**的角色（spec 里有 armB）不走这条：它的远臂有自己的一整套
+    # 切件，挂点必须落在画里那一块上，否则远臂会整条错位。
+    # 挂点取**远臂件的内容中心**，不是三角肌的中心：远臂在画里是斜着垂下的
+    # （肩靠里、腕靠外），三角肌在切件的左上角，拿它当支点会把整条胳膊平移出去。
+    # 取内容中心的好处是**切件会原样落回画里的位置**（渲染层把这一块以它为中心画）。
+    if 'armB' in spec:
+        if 'backShoulder' in spec:
+            back_px = X(spec['backShoulder'])
+        else:
+            btb = trim_box(pieces['armBU'])
+            back_px = X(spec['armB'][0][0] if isinstance(spec['armB'][0], (list, tuple))
+                         else spec['armB'][0]) + (btb[0] + btb[2]) / 2
+    else:
+        arm_half = rig['armFU']['w'] / 2
+        back_px = X(spec['torso'][1]) - arm_half
     rig['shoulderDx'] = (shoulder_px - axis_px) * k
     rig['backShoulderDx'] = (back_px - axis_px) * k
     rig['axisX'] = axis_px
@@ -431,13 +549,19 @@ def cut_one(cid, spec, verbose=True):
     rig['headDx'] = (head_c_px - axis_px) * k
 
     # 骨段长度：上臂按**解剖**量（肩关节→肘）——那一块多出来的一截是三角肌，
-    # 渲染层会把它往上伸（不是骨段变长）。其余各段就是切出来那一块的高。
+    # 渲染层会把它往上伸（不是骨段变长）。其余各段按解剖量（关节→关节），
+    # **不按切件的自然高**：切件在关节处多留了重叠的一截（见 arm_ov/leg_ov），
+    # 自然高比解剖量大一块，拿它当骨长，胳膊就凭空长了一截。
     rig['upperArm'] = (spec['elbow'] - spec['shoulder']) / 100 * H * k
-    rig['lowerArm'] = rig['armFL']['h']
-    rig['handLen'] = rig['handF']['h']
-    rig['thigh'] = rig['legFU']['h']
-    rig['shin'] = rig['legFL']['h']
+    rig['lowerArm'] = (spec['wrist'] - spec['elbow']) / 100 * H * k
+    rig['handLen'] = (spec['handEnd'] - spec['wrist']) / 100 * H * k
+    rig['thigh'] = (spec['knee'] - spec['hip']) / 100 * H * k
+    rig['shin'] = (spec['ankle'] - spec['knee']) / 100 * H * k
     rig['torsoLen'] = rig['chinY'] - rig['hipY']
+    # 关节重叠量（逻辑单位）：渲染层把每一段画得比骨段长这么多，
+    # 贴图自然高度不变（1:1 仍成立），多出来的正好补住弯关节裂开的那道缝。
+    rig['armOv'] = arm_ov / 100 * H * k
+    rig['legOv'] = leg_ov / 100 * H * k
 
     # 脚件：锚点（踝）在脚件里的横向位置
     fbox = trim_box(pieces['footF'])
@@ -463,9 +587,11 @@ def cut_one(cid, spec, verbose=True):
 
     # ---- 拼版核对图 --------------------------------------------------------
     order = ['head', 'torso', 'armFU', 'armFL', 'handF', 'legFU', 'legFL', 'footF']
+    # 有远臂的角色把远臂那三块也摆上——不然拼版图上看不出远臂切成了什么样
+    order += [n for n in ('armBU', 'armBL', 'handB') if n in pieces]
     W2 = 940
     rowh = 300
-    sheet = Image.new('RGB', (W2, rowh * 2 + 40), (240, 236, 226))
+    sheet = Image.new('RGB', (W2, rowh * ((len(order) + 3) // 4) + 40), (240, 236, 226))
     from PIL import ImageDraw
     d = ImageDraw.Draw(sheet)
     for i, name in enumerate(order):
@@ -484,7 +610,7 @@ def cut_one(cid, spec, verbose=True):
            fill=(180, 0, 0))
     sheet.save(os.path.join(OUT, f'{cid}-pieces.png'))
     if verbose:
-        print(f'{cid}: 切完 8 块 → {os.path.relpath(outdir, ROOT)}')
+        print(f'{cid}: 切完 {len(pieces)} 块 → {os.path.relpath(outdir, ROOT)}')
     return rig
 
 

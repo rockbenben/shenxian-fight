@@ -38,14 +38,14 @@ export function onPartsLoaded(fn: () => void): () => void {
   return () => partsWaiters.delete(fn);
 }
 
-export function preloadParts(id: string): void {
+export function preloadParts(id: string, backArm = false): void {
   if (partsCache.has(id)) return; // 已在探测中或已有结果，不重复发起
   partsCache.set(id, 'pending');
   // catch 是必须的：loadParts 抛出时（见 parts.ts 的 verticalBounds）原来会把这个 id
   // **永久留在 'pending'**——has(id) 挡住后续每一次重试，等待者一个都不触发，
   // 那个角色整场都是火柴人，且控制台只有一条 unhandled rejection。
   // 失败就把坑位删掉让下次能重来，并且照样通知一次，让立绘先按火柴人画出来。
-  loadParts(id)
+  loadParts(id, backArm)
     .then(p => { partsCache.set(id, p); })
     .catch(() => { partsCache.delete(id); })
     .finally(() => { for (const w of [...partsWaiters]) w(); });
@@ -821,7 +821,7 @@ function poseFor(f: Fighter): Pose {
  * 只取 part.top..part.bottom 这段内容行（parts.ts 已裁掉上下透明留白），横向仍是整张图——
  * 素材自带的留白多少不再影响这一段贴图实际画出来有多高，接缝就不再随素材抖动。
  */
-export function drawBoneImg(ctx: CanvasRenderingContext2D, x: number, y: number, ex: number, ey: number, w: number, part: PartImage, white: boolean, facing: number, topExtend = 0) {
+export function drawBoneImg(ctx: CanvasRenderingContext2D, x: number, y: number, ex: number, ey: number, w: number, part: PartImage, white: boolean, facing: number, topExtend = 0, extra = 0) {
   const dx = ex - x, dy = ey - y;
   const len = Math.hypot(dx, dy) || 1;
   ctx.save();
@@ -837,7 +837,11 @@ export function drawBoneImg(ctx: CanvasRenderingContext2D, x: number, y: number,
   const sw = Math.max(1, right - left), sh = Math.max(1, bottom - top);
   // topExtend：把这一块往上伸出一截（肩头的三角肌），底端仍落在骨段末端。
   // 伸出去的量与块的自然长度对应，宽高比不变——只是这块的**支点**在下面那截。
-  const dy0 = -topExtend, dh = len + topExtend;
+  // extra：往**下**多画一截（关节重叠）。切件在下一个关节往下多留了一截，
+  // 弯起关节时两块之间会裂开一道楔形的空；多画的这一截正好补住它，
+  // 而后画的那一段会盖住重叠、只把空的那块露出来。
+  // 画出来的高度 = 贴图自然高度，所以贴图不会被抻（1:1 仍成立）。
+  const dy0 = -topExtend, dh = len + topExtend + extra;
   if (white) drawWhitePart(ctx, part, left, top, sw, sh, -w, dy0, w * 2, dh);
   else ctx.drawImage(part.img, left, top, sw, sh, -w, dy0, w * 2, dh);
   ctx.restore();
@@ -1819,24 +1823,42 @@ function drawDollLimbs(
   const segHalfW = (q: PartImage) => (q.right - q.left) * k / 2;
 
   const armFU = doll.armFU!, armFL = doll.armFL!, handF = doll.handF!;
+  // 后臂（画面右那一条）：画里**两条胳膊都画全了**的角色有自己的一套切件——
+  // 远臂在画里是斜着垂下的、带着手，拿近臂的图顶替会变成一块竖着的板子。
+  // 没有自己那套的角色（远臂被身体挡着）继续复用近臂的图。
+  const armBU = doll.armBU ?? armFU, armBL = doll.armBL ?? armFL, handB = doll.handB ?? handF;
   const legFU = doll.legFU!, legFL = doll.legFL!, footF = doll.footF!;
   // 段长取自 rig（切件时量好的），段宽取自贴图自身的内容框——
   // 两者合起来保证每一块按画里的原尺寸落位，不抻不变形。
   const upperArm = rig.upperArm, lowerArm = rig.lowerArm, handLen = rig.handLen;
   const thigh = rig.thigh, shin = rig.shin;
+  // 关节重叠：切件在下一个关节往下多留的那一截（逻辑单位）。
+  // 姿势里肘弯 29°、膝弯 40°，两块各自绕自己的骨转，接缝处会裂开一道楔形的空；
+  // 多画的这一截正好补住它，而画出来的高度仍等于贴图自然高度（贴图不会被抻）。
+  const armOv = rig.armOv ?? 0, legOv = rig.legOv ?? 0;
 
   const a = dollAnchors(x, feetY, p.lean, p.crouch, fc, rig);
 
   // ---- 后侧肢体：先画，被躯干盖住 ----------------------------------------
   const armB = backArmFor(p, x, feetY, fc, weapon, build, rig) ?? p.armB;
-  const bUpExt = Math.max(0, (armFU.bottom - armFU.top) * k - upperArm);
-  seg(ctx, a.bshX, a.bshY, armB[0], upperArm, segHalfW(armFU), 0, fc, '', armFU, white, bUpExt);
-  const bElbow = segEnd(a.bshX, a.bshY, armB[0], upperArm, fc);
-  seg(ctx, bElbow[0], bElbow[1], armB[0] + armB[1], lowerArm, segHalfW(armFL), 0, fc, '', armFL, white);
-  const bHand = segEnd(bElbow[0], bElbow[1], armB[0] + armB[1], lowerArm, fc);
-  seg(ctx, bHand[0], bHand[1], armB[0] + armB[1], handLen, segHalfW(handF), 0, fc, '', handF, white);
-  const bKnee = seg(ctx, a.hipX + (rig.legBDx ?? 0) * fc, a.hipY, p.legB[0], thigh, segHalfW(legFU), 0, fc, '', legFU, white);
-  const bAnk = seg(ctx, bKnee[0], bKnee[1], p.legB[0] - p.legB[1], shin, segHalfW(legFL), 0, fc, '', legFL, white);
+  // 后臂**只在画里露出来的时候才画**。
+  //
+  // 为什么：远臂被身体挡着的角色（多数是侧身站姿），画上根本没有第二条胳膊，
+  // 硬画一条就等于凭空多出一条——而且它挂在躯干右缘、姿势一摆就甩到身体外面，
+  // 画面上是一块悬着的板子（猪八戒、铁扇公主那几个最明显）。
+  // 画里两条胳膊都画全了的角色有自己的远臂件（armBU/armBL/handB），用那一套。
+  // 拉弓除外：弓弦的另一头要落在后手上，没有后手弓弦就没有落点。
+  let bHand: [number, number] | undefined;
+  if (doll.armBU || weapon?.kind === 'bow') {
+    const bUpExt = Math.max(0, (armBU.bottom - armBU.top) * k - upperArm - armOv);
+    seg(ctx, a.bshX, a.bshY, armB[0], upperArm, segHalfW(armBU), 0, fc, '', armBU, white, bUpExt, armOv);
+    const bElbow = segEnd(a.bshX, a.bshY, armB[0], upperArm, fc);
+    seg(ctx, bElbow[0], bElbow[1], armB[0] + armB[1], lowerArm, segHalfW(armBL), 0, fc, '', armBL, white, 0, armOv);
+    bHand = segEnd(bElbow[0], bElbow[1], armB[0] + armB[1], lowerArm, fc);
+    seg(ctx, bHand[0], bHand[1], armB[0] + armB[1], handLen, segHalfW(handB), 0, fc, '', handB, white);
+  }
+  const bKnee = seg(ctx, a.hipX + (rig.legBDx ?? 0) * fc, a.hipY, p.legB[0], thigh, segHalfW(legFU), 0, fc, '', legFU, white, 0, legOv);
+  const bAnk = seg(ctx, bKnee[0], bKnee[1], p.legB[0] - p.legB[1], shin, segHalfW(legFL), 0, fc, '', legFL, white, 0, legOv);
   drawDollFoot(ctx, bAnk, fc, footF, k, rig.footAnchorX, white);
 
   // ---- 前臂几何：兵器要用 -------------------------------------------------
@@ -1865,15 +1887,16 @@ function drawDollLimbs(
   ctx.restore();
 
   // ---- 前侧肢体：后画，压在躯干之上 --------------------------------------
-  const fKnee = seg(ctx, a.hipX + (rig.legFDx ?? 0) * fc, a.hipY, p.legF[0], thigh, segHalfW(legFU), 0, fc, '', legFU, white);
-  const fAnk = seg(ctx, fKnee[0], fKnee[1], p.legF[0] - p.legF[1], shin, segHalfW(legFL), 0, fc, '', legFL, white);
+  const fKnee = seg(ctx, a.hipX + (rig.legFDx ?? 0) * fc, a.hipY, p.legF[0], thigh, segHalfW(legFU), 0, fc, '', legFU, white, 0, legOv);
+  const fAnk = seg(ctx, fKnee[0], fKnee[1], p.legF[0] - p.legF[1], shin, segHalfW(legFL), 0, fc, '', legFL, white, 0, legOv);
   drawDollFoot(ctx, fAnk, fc, footF, k, rig.footAnchorX, white);
 
   // 上臂块比骨段长出来的那一截是**三角肌**（肩头）。它必须画在肩关节**之上**，
   // 绕着肩关节转——否则肩头就是一道平口，而且抬手时三角肌不会跟着肩膀转。
   // 办法：把这一块往上伸（画在骨段起点的上方），块的底端仍然落在肘上。
-  const upExt = Math.max(0, (armFU.bottom - armFU.top) * k - upperArm);
-  seg(ctx, a.nshX, a.nshY, p.armF[0], upperArm, segHalfW(armFU), 0, fc, '', armFU, white, upExt);
+  // 底下多出的 armOv 是关节重叠（补住弯肘时的缝），画出来的高度仍等于贴图自然高度。
+  const upExt = Math.max(0, (armFU.bottom - armFU.top) * k - upperArm - armOv);
+  seg(ctx, a.nshX, a.nshY, p.armF[0], upperArm, segHalfW(armFU), 0, fc, '', armFU, white, upExt, armOv);
 
   // ---- 兵器：在躯干与腿**之后**、在手之前 --------------------------------
   // 为什么与旧管线相反：旧管线里兵器压在躯干之前，是因为那柄枪横过胸口，
@@ -1889,9 +1912,9 @@ function drawDollLimbs(
       weapon.kind === 'bow' ? bHand : undefined);
   }
 
-  seg(ctx, a.nshX, a.nshY, p.armF[0], upperArm, segHalfW(armFU), 0, fc, '', armFU, white);
+  seg(ctx, a.nshX, a.nshY, p.armF[0], upperArm, segHalfW(armFU), 0, fc, '', armFU, white, upExt, armOv);
   const fElbow2 = segEnd(a.nshX, a.nshY, p.armF[0], upperArm, fc);
-  seg(ctx, fElbow2[0], fElbow2[1], p.armF[0] + p.armF[1], lowerArm, segHalfW(armFL), 0, fc, '', armFL, white);
+  seg(ctx, fElbow2[0], fElbow2[1], p.armF[0] + p.armF[1], lowerArm, segHalfW(armFL), 0, fc, '', armFL, white, 0, armOv);
   const fHand2 = segEnd(fElbow2[0], fElbow2[1], p.armF[0] + p.armF[1], lowerArm, fc);
   seg(ctx, fHand2[0], fHand2[1], p.armF[0] + p.armF[1], handLen, segHalfW(handF), 0, fc, '', handF, white);
 }
@@ -1922,11 +1945,11 @@ function drawDollFoot(
  * 每帧要走八次，不该让渲染的正确性挂在替身身上。 */
 function seg(
   ctx: CanvasRenderingContext2D, x: number, y: number, angle: number, len: number, r1: number, r2: number, facing: number,
-  fill: string, img?: PartImage, white = false, topExtend = 0,
+  fill: string, img?: PartImage, white = false, topExtend = 0, extra = 0,
 ): [number, number] {
   const [ex, ey] = segEnd(x, y, angle, len, facing);
   if (img) {
-    drawBoneImg(ctx, x, y, ex, ey, r1, img, white, facing, topExtend);
+    drawBoneImg(ctx, x, y, ex, ey, r1, img, white, facing, topExtend, extra);
   } else {
     ctx.fillStyle = white ? '#fff' : limbGrad(ctx, x, y, ex, ey, r1 * 2, fill);
     // capStart=false：起点圆帽不描边，肘/膝上那道横贯的黑带就没了（原因见 fillTapered）

@@ -15,8 +15,11 @@ import path from 'node:path';
 test('public/chars 里的每个文件都在探测列表内，且命名合规', () => {
   const PROBED = ['head', 'torso'];          // 与 src/render/parts.ts 的 NAMES 一致
   // 纸偶件那一套（整人一张画切出来的），放在 chars/<id>/doll/ 下，
-  // 与 src/render/parts.ts 的 DOLL_NAMES 一致
-  const DOLL_PROBED = ['head', 'torso', 'armFU', 'armFL', 'handF', 'legFU', 'legFL', 'footF'];
+  // 与 src/render/parts.ts 的 DOLL_NAMES + DOLL_BACK_NAMES 一致。
+  // 远臂那三件（armBU/armBL/handB）只有画里两条胳膊都画全了的角色才有，
+  // 按角色有没有（rig.backArm）来探——其余角色探了就是必然 404。
+  const DOLL_PROBED = ['head', 'torso', 'armFU', 'armFL', 'handF', 'legFU', 'legFL', 'footF',
+    'armBU', 'armBL', 'handB'];
   const root = 'public/chars';
   expect(fs.existsSync(root), 'public/chars 不见了').toBe(true);
 
@@ -49,4 +52,30 @@ test('public/chars 里的每个文件都在探测列表内，且命名合规', (
     }
   }
   expect(stray, `public/chars 里有挂不上的素材：\n${stray.join('\n')}`).toEqual([]);
+});
+
+// 远臂那三件（armBU/armBL/handB）**按角色有没有**来探（rig.backArm）。
+// 两边对不上就是两种毛病：素材有而标记没有 → 永远不会被加载（画面上那条远臂是空的）；
+// 标记有而素材没有 → 三个必然 404（选人页一次预载十二个人就是三十六个白跑的请求）。
+test('远臂件与角色的 backArm 标记一一对应', () => {
+  const BACK = ['armBU', 'armBL', 'handB'];
+  const root = 'public/chars';
+  const charsDir = 'src/data/characters';
+  const bad = [];
+  for (const id of fs.readdirSync(root)) {
+    const dir = path.join(root, id);
+    if (!fs.statSync(dir).isDirectory()) continue;
+    const partsDir = path.join(dir, 'parts');
+    const has = BACK.filter(n => fs.existsSync(path.join(partsDir, `${n}.png`)));
+    const src = path.join(charsDir, `${id}.ts`);
+    if (!fs.existsSync(src)) { bad.push(`${id}: 没有 src/data/characters/${id}.ts`); continue; }
+    const flagged = /backArm:\s*true/.test(fs.readFileSync(src, 'utf8'));
+    if (flagged && has.length !== BACK.length) {
+      bad.push(`${id}: 标了 backArm 但远臂件只有 [${has}]（应为 ${BACK}）`);
+    }
+    if (!flagged && has.length) {
+      bad.push(`${id}: 有远臂件 [${has}] 却没标 backArm——这些文件永远不会被加载`);
+    }
+  }
+  expect(bad, `远臂件与 backArm 标记对不上：\n${bad.join('\n')}`).toEqual([]);
 });
