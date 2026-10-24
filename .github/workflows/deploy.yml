@@ -27,11 +27,17 @@ jobs:
           fetch-depth: 0
 
       - name: Setup Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v7
         with:
+          # 24 写死，不跟 package.json 的 engines 走：engines 是"最低能跑"的声明，
+          # CI 该跑在**已知能用**的那一档上（vitest 5 要求 ^22.12 || ^24 || >=26）
           node-version: 24
           cache: npm
 
+      # 依赖解析规则与本地完全一致：仓库根的 .npmrc 里 legacy-peer-deps=true，
+      # npm 会自动读它——那条开关是为绕开 npm 11.2.0 的 arborist 崩溃
+      # （@vitejs/plugin-react 的 optional peer → @babel/core@8 与 vite 的 babel 链冲突，
+      # 装出来的依赖树与不开这个开关时逐包相同，详见 .npmrc 里的注释）
       - name: Install dependencies
         run: npm ci
 

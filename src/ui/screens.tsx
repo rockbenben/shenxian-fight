@@ -7,7 +7,7 @@ import { isMuted, setMuted, unlockAudio } from '../render/sfx';
 import { drawPortrait, onPartsLoaded, preloadParts } from '../render/renderer';
 import { goFullscreen, isCoarsePointer } from './fullscreen';
 import { LEFT_OF_CLUSTER, skillSlotFor } from './TouchLayer';
-import { cn, lsFix, SAFE, SERIF, T, VERTICAL } from './theme';
+import { cn, lsFix, PAPER, SAFE, SEAL_BOX, SERIF, T, VERTICAL } from './theme';
 import type { CharacterDef, Dir, Fighter, InputFrame } from '../engine/types';
 import { ARENA_MAX, ARENA_MIN } from '../engine/types';
 import type { Battle } from '../engine/battle';
@@ -46,7 +46,14 @@ function Seal({ label, onClick }: { label: string; onClick: () => void }) {
   );
 }
 
-/** 次级行动：只有一条细下划线，不与印章争分量 */
+/** 次级行动：只有一条细下划线，不与印章争分量。
+ *
+ * 高度默认只有 32px——**没有下划线撑着，它是全站最小的触摸目标**，低于本仓自己
+ * 给静音键定的 40px 拇指下限。哪一颗是"开打之前要做的决定"（标题页那两颗）、
+ * 哪一颗是"这一页唯一的出口"（操作说明页的返回），由调用方用 style 抬到 40px：
+ * 抬的办法是加**上**内边距（文字仍坐在下划线上），不是 minHeight（那会把字浮起来）。
+ * 选人页与陪练场那几颗不动——那两处的竖向余量是 0（选人页的「出战」出屏 3px、
+ * 陪练场的挡位条要避开跳起的木桩），抬起 8px 就会把别的东西推出屏幕。 */
 function Ghost({ label, onClick, style, className }: {
   label: string; onClick: () => void; style?: React.CSSProperties;
   /** 额外类名。目前只用来给陪练场那颗小号出口挂 sx-chip（撑开热区，不长高） */
@@ -65,6 +72,10 @@ function Ghost({ label, onClick, style, className }: {
     >{label}</button>
   );
 }
+
+/** 把一颗次级按钮的触摸高度抬到 40px：上内边距加厚，文字仍坐在下划线上。
+ *  18 = 40（拇指下限）− 22（字号 15px 的行盒 18 + 1px 下划线）− 4（底下已有 4px） */
+const TALL_GHOST: React.CSSProperties = { padding: '14px 4px 4px' };
 
 /** 静音开关：标题页和战斗中共用同一份实现/状态（sfx.ts 里的模块级 `muted`）。
  * top/right 是相对安全区边缘的像素偏移，实际 CSS 值再叠加 env(safe-area-inset-*)。
@@ -155,13 +166,29 @@ export function Title({ onStart, onTraining, onHelp, record, hint, diff = DEFAUL
         display: 'flex', alignItems: 'center', gap: 'clamp(20px, 6vw, 56px)',
         padding: '0 clamp(16px, 5vw, 48px)',
       }}>
-        <h1 style={{
-          ...VERTICAL, margin: 0, fontFamily: SERIF, fontWeight: 500,
-          fontSize: 'clamp(30px, min(14vh, 9vw), 104px)', letterSpacing: 'clamp(4px, 1.6vh, 12px)',
-          lineHeight: 1,
-        }}>神仙打架</h1>
+        {/* 标题与落款的那枚闲章。竖排字旁边盖一枚方印，是招牌上落款的惯例——
+            此前标题孤零零立在那儿，旁边什么都没有 */}
+        <div style={{ display: 'flex', alignItems: 'flex-end', gap: 'clamp(6px, 1.4vw, 14px)' }}>
+          <h1 style={{
+            ...VERTICAL, margin: 0, fontFamily: SERIF, fontWeight: 500,
+            fontSize: 'clamp(30px, min(14vh, 9vw), 104px)', letterSpacing: 'clamp(4px, 1.6vh, 12px)',
+            lineHeight: 1,
+          }}>神仙打架</h1>
+          <span aria-hidden style={{
+            ...SEAL_BOX,
+            fontFamily: SERIF, fontSize: 'clamp(11px, min(2.2vh, 1.4vw), 19px)',
+            writingMode: 'vertical-rl', textOrientation: 'upright',
+            padding: '7px 4px', lineHeight: 1, letterSpacing: 2,
+            alignSelf: 'flex-end', marginBottom: '0.35em', borderRadius: 0,
+          }}>格斗</span>
+        </div>
         <div style={{ borderLeft: `1px solid ${T.hair}`, alignSelf: 'stretch' }} />
-        <div style={{ display: 'grid', gap: 'clamp(10px, 2.6vh, 20px)', justifyItems: 'start' }}>
+        {/* 行动区压在一块宣纸贴片上：字不再浮在夜空渐变里，读起来像摆在桌上的东西 */}
+        <div style={{
+          ...PAPER,
+          padding: 'clamp(14px, 2.8vh, 26px) clamp(18px, 3.2vw, 36px)',
+          display: 'grid', gap: 'clamp(10px, 2.6vh, 20px)', justifyItems: 'start',
+        }}>
           <p style={{ margin: 0, fontSize: 'clamp(12px, min(2.4vh, 1.5vw), 21px)', letterSpacing: 4, color: T.faint }}>
             东方神话 · 街机格斗
           </p>
@@ -169,8 +196,8 @@ export function Title({ onStart, onTraining, onHelp, record, hint, diff = DEFAUL
               授权，一旦被 await 打断到微任务之后，浏览器会直接拒绝 */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 'clamp(14px, 4vw, 28px)' }}>
             <Seal label="开始闯关" onClick={() => { unlockAudio(); goFullscreen(); onStart(); }} />
-            <Ghost label="陪练场" onClick={() => { unlockAudio(); goFullscreen(); onTraining(); }} />
-            <Ghost label="操作说明" onClick={onHelp} />
+            <Ghost label="陪练场" onClick={() => { unlockAudio(); goFullscreen(); onTraining(); }} style={TALL_GHOST} />
+            <Ghost label="操作说明" onClick={onHelp} style={TALL_GHOST} />
           </div>
           <p style={{ margin: 0, fontSize: 'clamp(11px, min(2.1vh, 1.3vw), 18px)', letterSpacing: 2, color: T.dim }}>
             六关连战 · 对手每趟不同 · 离线可玩
@@ -383,7 +410,9 @@ export function Help({ onBack }: { onBack: () => void }) {
           // 兜不住这么大一块亮面。给说明区自己垫一张暗底（同静音键/提示条那一族的夜色），
           // 标题与「返回」仍然浮在夜景上，不动整页的构图
           // 只加横向内边距：竖向再加一点，932x430 上本来刚好放得下的内容就又要滚 12px 了
-          background: 'rgba(7,13,24,.72)',
+          // 底色要够实：.72 时月亮仍透成一枚灰饼压在「进攻」那几行上（实测 1024x600 最明显），
+          // 压到 .9 才真正是一块底板——这一页是说明书，不是风景。
+          background: 'rgba(7,13,24,.9)',
           padding: '0 clamp(8px, 2vw, 18px)',
           // 底边那道"下面还有"的渐隐是 index.html 里的 .sx-more，由 helpPaneRef 按滚动位置挂摘
           // 折行之后 align-content 默认会把多余的竖向空间摊在行与行之间，
@@ -407,10 +436,12 @@ export function Help({ onBack }: { onBack: () => void }) {
             // 一行说三件事（怎么出、去哪查、键盘是哪几个）在 667x375 下会顶到右边缘。
             // 拆成两行：先说怎么出，再说去哪查——后者是"需要时才找"的信息，不该和操作挤在一起。
             ['技能', '技能键 + 摇杆：中立 / 推方向 / 推下　三记必杀'],
-            ['招式表', '选人页里每个人的四招都写着'],
+            // 「四招」是错的：选人页那张表是**五行**——三记必杀加奥义、超必杀两档大招。
+            // 屏上写着一个数，而这个数是数得出来的（表就在隔壁那一屏），数错了比不写更坏。
+            ['招式表', '选人页里每个人的五招都写着'],
             // 陪练场里那三处"和正式对局不一样"此前一个字都不说：气槽一放就回满、
             // 读秒停在 60、双方血都打不掉。在这里练出来的手感需要知道它便宜在哪
-            ['陪练场', '标题页进　这里气常满、不读秒、双方的血打不掉'],
+            ['陪练场', '标题页进　这里气常满、不读秒、双方都打不死'],
             ['大招', '大招键　气 50 奥义 / 100 超必杀'],
             ['防御', '防御键　推下=蹲防'],
             ['投技', '贴身按普攻键自动改投'],
@@ -452,7 +483,7 @@ export function Help({ onBack }: { onBack: () => void }) {
             fontSize: 'clamp(11px, min(1.9vh, 1.2vw), 15px)', letterSpacing: 1, color: T.faint, ...lsFix(1),
           }}>键盘（桌面）　移动 A D　跳 W　蹲 S　普攻 J　技能 U I O　大招 K　防御 L　吹飞 H（或 J + L）</div>
         </div>
-        <Ghost label="返回" onClick={onBack} />
+        <Ghost label="返回" onClick={onBack} style={TALL_GHOST} />
       </div>
     </div>
   );
@@ -502,7 +533,9 @@ export const ROUND_NAMES = ['第一回合', '第二回合', '最终回合'];
  * 两处各写一份迟早对不上（这个项目在规则漂移上栽过四次）。
  */
 export const SKILL_ROWS = [
-  { key: '技', say: '技能键', dir: { left: false, right: false, crouch: false } },
+  // 三行必须平行可读：「技」单独一个看不出是"不推方向"那一档，与另两行的
+  // 「←→ + 技」「↓ + 技」放在一起，读者要自己推一步才知道第一个是什么。
+  { key: '中立 + 技', say: '技能键', dir: { left: false, right: false, crouch: false } },
   { key: '←→ + 技', say: '推左右加技能键', dir: { left: true, right: false, crouch: false } },
   { key: '↓ + 技', say: '下蹲加技能键', dir: { left: false, right: false, crouch: true } },
 ] as const;
@@ -531,9 +564,11 @@ export function RoundScore({ wins, need, battle }: { wins: [number, number]; nee
     return () => clearInterval(t);
   }, []);
   const sec = Math.ceil(battle.timeLeft / 60);
+  // 回合比分用**方**点不用圆点：全站的"重笔"是方章（朱砂印、竖排卷轴的印框），
+  // 圆点是另一套语汇。空点只留一道发丝边，读作"还没拿下的那一局"
   const pip = (on: boolean) => (
     <span style={{
-      width: 9, height: 9, borderRadius: '50%', display: 'inline-block',
+      width: 9, height: 9, display: 'inline-block',
       background: on ? T.tenghuang : 'transparent',
       border: `1px solid ${on ? T.tenghuang : T.hair}`,
       boxShadow: on ? `0 0 6px ${T.tenghuang}` : 'none',
@@ -550,12 +585,19 @@ export function RoundScore({ wins, need, battle }: { wins: [number, number]; nee
     }}>
       {/* 己方的点靠中轴那一侧先亮，读起来和血条一样是"从中间往外长" */}
       {side(wins[0], true)}
-      {/* 读秒摆在两侧比分之间——经典格斗 HUD 就是这个位置。最后十秒转朱砂色 */}
+      {/* 读秒摆在两侧比分之间——经典格斗 HUD 就是这个位置。最后十秒转朱砂色。
+          两侧各立一道竖线，像卷轴的两道边：读秒因此从一堆散点里独立出来 */}
       <span style={{
-        fontFamily: SERIF, fontSize: 20, lineHeight: 1, minWidth: '2ch', textAlign: 'center',
-        color: sec <= 10 ? T.zhusha : T.paper,
-        textShadow: sec <= 10 ? `0 0 10px ${T.zhusha}` : 'none',
-      }}>{sec}</span>
+        display: 'inline-flex', alignItems: 'center', gap: 8,
+      }}>
+        <span aria-hidden style={{ width: 1, height: 22, background: T.hair }} />
+        <span style={{
+          fontFamily: SERIF, fontSize: 20, lineHeight: 1, minWidth: '2ch', textAlign: 'center',
+          color: sec <= 10 ? T.zhusha : T.paper,
+          textShadow: sec <= 10 ? `0 0 10px ${T.zhusha}` : '0 1px 6px rgba(4,9,16,.9)',
+        }}>{sec}</span>
+        <span aria-hidden style={{ width: 1, height: 22, background: T.hair }} />
+      </span>
       {side(wins[1], false)}
     </div>
   );
@@ -843,12 +885,21 @@ export function Select({ onPick, onBack, training, cleared = [], pick = 0, onFoc
           </div>
           {/* 详情：一次只读一个人的四条属性，读得动 */}
           <div style={{
-            // gap 下限 6 → 5：招式表补上 50 气那一档之后，「返回」又被顶出屏幕 2px
-            //（实测 bottom=322 / 视口 320，正是 batch1 刚修掉的那个 blocker 回来了）。
-            // 这一列一共六个间隙，收 1px 换回 6px 余量。**以后往这一列加行，先复量 568x320。**
-            display: 'grid', gap: 'clamp(5px, 1.6vh, 12px)', justifyItems: 'start',
+            position: 'relative',
+            // gap 下限 6 → 5 → 4：招式表补上 50 气那一档之后，「返回」又被顶出屏幕 2px
+            //（实测 bottom=322 / 视口 320，正是 batch1 刚修掉的那个 blocker 回来了）；
+            // 这次实测又是 3px 出屏（568x320 下「出战」底边 323）。一列六个间隙，
+            // 每个收 1px 就是 6px 余量。**以后往这一列加行，先复量 568x320。**
+            display: 'grid', gap: 'clamp(4px, 1.2vh, 12px)', justifyItems: 'start',
             minWidth: 'clamp(120px, 22vw, 210px)',
           }}>
+            {/* 宣纸贴片垫在详情底下。**绝对定位 + 负内缩**：这一列的垂直余量只剩 6px，
+                给它加内边距就会把「返回」顶出屏幕——贴片因此不吃布局，只吃视觉 */}
+            <span aria-hidden style={{
+              ...PAPER, position: 'absolute',
+              inset: 'clamp(-8px,-1.6vh,-6px) clamp(-10px,-1.6vw,-8px)',
+              zIndex: -1, pointerEvents: 'none',
+            }} />
             <span style={{
               fontFamily: SERIF, fontSize: 'clamp(19px, min(4.4vh, 2.6vw), 40px)',
               letterSpacing: 3, lineHeight: 1, color: T.paper,
@@ -921,7 +972,7 @@ export function Select({ onPick, onBack, training, cleared = [], pick = 0, onFoc
                 两屏因此同一形制。属性与招式表一条都不砍——那六条是"卡面不说谎"逼出来的。 */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 'clamp(14px, 4vw, 28px)' }}>
               <Seal label={training ? '进陪练场' : '出战'} onClick={() => onPick(cur)} />
-              <Ghost label="返回" onClick={onBack} />
+              <Ghost label="返回" onClick={onBack} style={TALL_GHOST} />
             </div>
           </div>
         </div>
@@ -949,14 +1000,36 @@ export function Result({ won, stage, last, total, stageName, bossName, nextStage
 }) {
   const headline = won ? (last ? '功德圆满' : '胜') : '败';
   return (
-    <div style={{ ...S.full, background: 'rgba(7,13,24,.74)' }}>
-      <div style={{ display: 'grid', gap: 'clamp(10px, 2.6vh, 20px)', justifyItems: 'center', padding: '0 24px' }}>
-        <h1 style={{
-          margin: 0, fontFamily: SERIF, fontWeight: 500,
-          fontSize: last && won ? 'clamp(30px, min(9vh, 6vw), 86px)' : 'clamp(42px, min(13vh, 8vw), 130px)',
-          letterSpacing: last && won ? 10 : 0, lineHeight: 1,
-          color: won ? T.paper : T.zhusha,
-        }}>{headline}</h1>
+    <div style={{ ...S.full, background: 'rgba(7,13,24,.62)', padding: '0 clamp(12px,4vw,40px)' }}>
+      {/* 整块内容压在一张宣纸上：结算页原本是一串字浮在夜色上，读起来像系统提示 */}
+      <div style={{
+        ...PAPER,
+        padding: 'clamp(16px, 3.6vh, 36px) clamp(20px, 4.4vw, 52px)',
+        display: 'grid', gap: 'clamp(10px, 2.6vh, 20px)', justifyItems: 'center',
+        maxWidth: 'min(94vw, 820px)',
+      }}>
+        {/* 胜负两个字盖在一枚朱砂方印的框里。全站只有这一种"重笔"：
+            画布里超必杀盖的印、菜单上那枚闲章、这里的印框，是同一套形制。
+            竖向内边距不能省：宋体的墨迹比行盒高（行高 1 时上下各溢出约 0.08em），
+            框贴着行盒画，笔画就会压到框上——实测 568x320 下「胜」字跨出框外。 */}
+        <div style={{
+          position: 'relative', display: 'inline-block',
+          padding: 'clamp(8px, 2.2vh, 24px) clamp(10px, 1.8vw, 26px)',
+        }}>
+          <span aria-hidden style={{
+            position: 'absolute', inset: 0,
+            border: `2px solid ${T.zhusha}`,
+            boxShadow: `inset 0 0 0 2px rgba(237,227,210,.3), inset 0 0 0 7px ${T.zhushaDeep}`,
+            opacity: won ? 0.45 : 0.26,
+          }} />
+          <h1 style={{
+            position: 'relative',
+            margin: 0, fontFamily: SERIF, fontWeight: 500,
+            fontSize: last && won ? 'clamp(30px, min(9vh, 6vw), 86px)' : 'clamp(42px, min(13vh, 8vw), 130px)',
+            letterSpacing: last && won ? 10 : 0, lineHeight: 1,
+            color: won ? T.paper : T.zhusha,
+          }}>{headline}</h1>
+        </div>
         {/* 之前只有「第 N 关 · 胜」，输了连是谁打赢的都不说。四关连战却从没告诉玩家走到哪了 */}
         {/* 打的是哪一关、对手是谁，比"共四关"这条进度更要紧——初版把这行给了 faint、
             进度行给了更亮的 dim，层级正好反了 */}
@@ -1000,7 +1073,7 @@ export function Result({ won, stage, last, total, stageName, bossName, nextStage
         <div style={{ display: 'flex', alignItems: 'center', gap: 'clamp(16px, 5vw, 32px)', marginTop: 4 }}>
           {won && !last && <Seal label="下一关" onClick={onNext} />}
           {!won && <Seal label="再战" onClick={onRetry} />}
-          <Ghost label="回主页" onClick={onHome} />
+          <Ghost label="回主页" onClick={onHome} style={TALL_GHOST} />
         </div>
       </div>
     </div>

@@ -3,7 +3,7 @@ import { Battle, KO_OUTRO, ROUND_TIME, carryOverMeter } from './engine/battle';
 import { aiSeed, createAi } from './engine/ai';
 import { CHARACTERS } from './data/characters';
 import { introQuote, loseQuote } from './data/quotes';
-import { applyDifficulty, buildRun, DEFAULT_DIFFICULTY, DIFFICULTIES, HARDEST_DIFF, RUN_AI, RUN_DMG_SCALE, RUN_HP_SCALE } from './data/stages';
+import { applyDifficulty, buildRun, DEFAULT_DIFFICULTY, DIFFICULTIES, HARDEST_DIFF, HOME, RUN_AI, RUN_DMG_SCALE, RUN_HP_SCALE } from './data/stages';
 import type { Stage } from './data/stages';
 import { GameCanvas } from './ui/GameCanvas';
 import { loadSkeleton, preloadParts } from './render/renderer';
@@ -193,7 +193,16 @@ function Fight({ scene, run, diff, attempt, onEnd, onExit }: {
 }) {
   // 难度档套在关卡上：改的是 BOSS 的反应率（AI）与血量/伤害（下面两处 scale）
   const d = DIFFICULTIES[diff] ?? DIFFICULTIES[DEFAULT_DIFFICULTY];
-  const stage = applyDifficulty(run[scene.stage], d);
+  const DP = dpFixture();
+  // 夹具指定了 foe 时，**背景与关名也跟着换成那个人的主场**。
+  // 夹具原本只换人不换景，于是「?dp=fight&foe=nezha」拍出来是拿哪吒站在钟馗的鬼门关里——
+  // 画面看着完全正常，参数却静默空转了一半（与之前「指 zhongkui 拍出来的是 leizhen」同类）。
+  // 真局里对手与场景本来就是同一个人的主场（一人一景），夹具也该照这个规矩。
+  // 难度档不动：AI 仍用这一关本来的表——换 AI 会让两次取景的难度不可比。
+  const baseStage = DP?.foeId && HOME[DP.foeId]
+    ? { ...run[scene.stage], bossId: DP.foeId, name: HOME[DP.foeId].name, bg: HOME[DP.foeId].bg }
+    : run[scene.stage];
+  const stage = applyDifficulty(baseStage, d);
   const [round, setRound] = useState(0);
   /** 上一回合结束时双方剩下的气。放 ref 不放 state：它只在建下一场时读一次，
    * 用 state 会多一次重渲染，还得小心和 round 的更新次序 */
@@ -202,7 +211,6 @@ function Fight({ scene, run, diff, attempt, onEnd, onExit }: {
   // 陪练场的对手可以换。正式对局里对手是关卡定死的，这个 state 不会动——
   // 但**夹具那一支例外**：`?dp=fight&foe=X` 要能在正式对局那一屏也换人，否则参数静默
   // 空转（量过：指 zhongkui 拍出来的是这一关注定的 leizhen，画面看着完全正常）。
-  const DP = dpFixture();
   const [foeId, setFoeId] = useState(() => DP?.foeId ?? stage.bossId);
   const bossId = scene.training || DP ? foeId : stage.bossId;
   const battle = useMemo(() => {

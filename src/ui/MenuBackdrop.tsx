@@ -64,10 +64,23 @@ export function MenuBackdrop() {
       // 于是地平线以下出现一条比山影还亮的横带（对局里那块是被地面盖住的，这里没有地面）。
       // 补一层地面色把它盖掉，接缝处压一道更深的线当地平线。
       const offY = (viewport.h - LOGIC_H) / 2, offX = (viewport.w - LOGIC_W) / 2;
-      ctx.fillStyle = MENU_BG.ground;
+      // 地面不是一块平涂：近地平线亮（被雾照着），往镜头方向压暗。
+      // 菜单这块地占了下半屏一大片，平涂时它就是一块死黑——标题页"下半屏是空的"就是它造成的
+      const gg = ctx.createLinearGradient(0, FLOOR_Y, 0, viewport.h - offY);
+      gg.addColorStop(0, 'rgba(43,88,118,.55)');
+      gg.addColorStop(0.25, 'rgba(16,32,50,.9)');
+      gg.addColorStop(1, 'rgba(6,12,20,1)');
+      ctx.fillStyle = gg;
       ctx.fillRect(-offX, FLOOR_Y, viewport.w, viewport.h - FLOOR_Y - offY + 2);
       ctx.fillStyle = 'rgba(6,16,25,.85)';
       ctx.fillRect(-offX, FLOOR_Y, viewport.w, 2);
+      // 地平线上方一道雾带：远处的东西该被雾吃掉，菜单这块却什么都没有，
+      // 于是山影与天空之间是一道硬边（对局里由 drawBg 的 haze 负责，菜单这块没有地面层）
+      const haze = ctx.createLinearGradient(0, FLOOR_Y, 0, FLOOR_Y - 150);
+      haze.addColorStop(0, 'rgba(43,88,118,.34)');
+      haze.addColorStop(1, 'rgba(43,88,118,0)');
+      ctx.fillStyle = haze;
+      ctx.fillRect(-offX, FLOOR_Y - 150, viewport.w, 152);
       raf = requestAnimationFrame(frame);
     };
     frame();

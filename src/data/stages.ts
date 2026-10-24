@@ -5,6 +5,12 @@ export type Celestial = 'moon' | 'crescent' | 'sun';
 export interface StageBg {
   sky: [string, string]; ground: string; silhouette: string; seed: number;
   celestial: Celestial; celestialColor: string;
+  /**
+   * 这一关的 id（角色 id）。**只给渲染层找美术用**：`public/stages/<id>/far.webp`
+   * 这类远景图按 id 索引，缺图时回退到程序化画的剪影（见 src/render/stageArt.ts）。
+   * 不给 id 的背景（比如菜单专用的那张）就没有远景美术可用。
+   */
+  id?: string;
   /** 氛围粒子层：每关一种，是这关最直接的"这是哪儿"的信号 */
   /**
    * 氛围粒子。六种形态各有各的运动：ember 向上飘、petal 打着旋往下落、firefly 原地浮、
@@ -39,62 +45,62 @@ export interface Stage { name: string; bossId: string; ai: AiProfile; bg: StageB
 export const HOME: Record<string, { name: string; bg: StageBg }> = {
   nezha: {
     name: '东海之滨',
-    bg: { sky: ['#0d2a4a', '#3a7a9a'], ground: '#12283a', silhouette: '#0a1f33', seed: 11, celestial: 'moon', celestialColor: '#EDE3D2', ambient: { kind: 'firefly', color: '#9fd8ff', count: 34 } },
+    bg: { id: 'nezha', sky: ['#0d2a4a', '#3a7a9a'], ground: '#12283a', silhouette: '#0a1f33', seed: 11, celestial: 'moon', celestialColor: '#EDE3D2', ambient: { kind: 'firefly', color: '#9fd8ff', count: 34 } },
   },
   erlang: {
     name: '灌江口',
-    bg: { sky: ['#1c1636', '#5a4a8a'], ground: '#221c40', silhouette: '#161030', seed: 22, celestial: 'crescent', celestialColor: '#EDE3D2', ambient: { kind: 'firefly', color: '#c7a6ff', count: 30 } },
+    bg: { id: 'erlang', sky: ['#1c1636', '#5a4a8a'], ground: '#221c40', silhouette: '#161030', seed: 22, celestial: 'crescent', celestialColor: '#EDE3D2', ambient: { kind: 'firefly', color: '#c7a6ff', count: 30 } },
   },
   wukong: {
     name: '花果山',
-    bg: { sky: ['#0e2a1a', '#4a8a5a'], ground: '#14301e', silhouette: '#0a2012', seed: 33, celestial: 'sun', celestialColor: '#D9A441', ambient: { kind: 'petal', color: '#ffd7e0', count: 30 } },
+    bg: { id: 'wukong', sky: ['#0e2a1a', '#4a8a5a'], ground: '#14301e', silhouette: '#0a2012', seed: 33, celestial: 'sun', celestialColor: '#D9A441', ambient: { kind: 'petal', color: '#ffd7e0', count: 30 } },
   },
   // 积雷山·摩云洞：牛魔王的洞府本名。原来这条叫「积雷山·魔王真身」，
   // 是 12 个关名里唯一一个"地名·非地名"，而且和它下面那行「对手 · 牛魔王」
   // 把"魔王"说了两遍——"要现真身"这件事由超必杀名「真身巨牛」去说，关名只管地点。
   niumo: {
     name: '积雷山·摩云洞',
-    bg: { sky: ['#1c0606', '#6a1e10'], ground: '#260c08', silhouette: '#140404', seed: 44, celestial: 'moon', celestialColor: '#C8443C', ambient: { kind: 'ember', color: '#ff7a3c', count: 40 } },
+    bg: { id: 'niumo', sky: ['#1c0606', '#6a1e10'], ground: '#260c08', silhouette: '#140404', seed: 44, celestial: 'moon', celestialColor: '#C8443C', ambient: { kind: 'ember', color: '#ff7a3c', count: 40 } },
   },
   // 火云洞：洞口往外看的赤黑，火舌把岩壁烤成暗红。余烬最密——他本人就是一直在烧的
   honghaier: {
     name: '火云洞',
-    bg: { sky: ['#2a0a04', '#8a3a12'], ground: '#2e1008', silhouette: '#180602', seed: 55, celestial: 'sun', celestialColor: '#FF8C2B', ambient: { kind: 'ember', color: '#ffb24a', count: 52 } },
+    bg: { id: 'honghaier', sky: ['#2a0a04', '#8a3a12'], ground: '#2e1008', silhouette: '#180602', seed: 55, celestial: 'sun', celestialColor: '#FF8C2B', ambient: { kind: 'ember', color: '#ffb24a', count: 52 } },
   },
   // 翠云山·芭蕉洞：竹雾的青。全场唯一以绿为天的关，与她儿子的火云洞正好对着
   tieshan: {
     name: '翠云山·芭蕉洞',
-    bg: { sky: ['#0a2a26', '#4fa58c'], ground: '#0e2b26', silhouette: '#06201c', seed: 66, celestial: 'crescent', celestialColor: '#EEF3EA', ambient: { kind: 'petal', color: '#bdf0dc', count: 26 } },
+    bg: { id: 'tieshan', sky: ['#0a2a26', '#4fa58c'], ground: '#0e2b26', silhouette: '#06201c', seed: 66, celestial: 'crescent', celestialColor: '#EEF3EA', ambient: { kind: 'petal', color: '#bdf0dc', count: 26 } },
   },
   // 白虎岭：惨月照着白骨，天是发灰的青。粒子用萤火但压成骨白，读起来是浮在坡上的磷火
   baigu: {
     name: '白虎岭',
-    bg: { sky: ['#141a1c', '#5c6a66'], ground: '#1a2020', silhouette: '#0c1212', seed: 77, celestial: 'moon', celestialColor: '#E8E4D6', ambient: { kind: 'ash', color: '#cfd8d2', count: 26 } },
+    bg: { id: 'baigu', sky: ['#141a1c', '#5c6a66'], ground: '#1a2020', silhouette: '#0c1212', seed: 77, celestial: 'moon', celestialColor: '#E8E4D6', ambient: { kind: 'ash', color: '#cfd8d2', count: 26 } },
   },
   // 昆仑·射日台：九日刚落，天边还烧着。他站的是全名册最高的地方，所以天最开阔
   houyi: {
     name: '昆仑·射日台',
-    bg: { sky: ['#2a1408', '#e0913a'], ground: '#2a1c10', silhouette: '#180e06', seed: 88, celestial: 'sun', celestialColor: '#FFB340', ambient: { kind: 'ember', color: '#ffd08a', count: 28 } },
+    bg: { id: 'houyi', sky: ['#2a1408', '#e0913a'], ground: '#2a1c10', silhouette: '#180e06', seed: 88, celestial: 'sun', celestialColor: '#FFB340', ambient: { kind: 'ember', color: '#ffd08a', count: 28 } },
   },
   // 西岐·雷云崖：雷云压得极低，天与地几乎同色，只有电光把云底照亮
   leizhen: {
     name: '西岐·雷云崖',
-    bg: { sky: ['#101828', '#4a6fa8'], ground: '#141c2c', silhouette: '#0a1018', seed: 99, celestial: 'crescent', celestialColor: '#8FD0FF', ambient: { kind: 'spark', color: '#8fd0ff', count: 34 } },
+    bg: { id: 'leizhen', sky: ['#101828', '#4a6fa8'], ground: '#141c2c', silhouette: '#0a1018', seed: 99, celestial: 'crescent', celestialColor: '#8FD0FF', ambient: { kind: 'spark', color: '#8fd0ff', count: 34 } },
   },
   // 酆都·鬼门关：石阙与幡，天是暗紫。鬼火用萤火那一层，绿得发冷
   zhongkui: {
     name: '酆都·鬼门关',
-    bg: { sky: ['#160a1e', '#4a2a52'], ground: '#1c1024', silhouette: '#0e0614', seed: 110, celestial: 'moon', celestialColor: '#7FE0A8', ambient: { kind: 'mist', color: '#7fe0a8', count: 16 } },
+    bg: { id: 'zhongkui', sky: ['#160a1e', '#4a2a52'], ground: '#1c1024', silhouette: '#0e0614', seed: 110, celestial: 'moon', celestialColor: '#7FE0A8', ambient: { kind: 'mist', color: '#7fe0a8', count: 16 } },
   },
   // 常羊山：荒原、断碑、血日。没有一点绿——他在这里已经打了很多年
   xingtian: {
     name: '常羊山',
-    bg: { sky: ['#2a1410', '#9a4a2a'], ground: '#2c1a12', silhouette: '#180c08', seed: 121, celestial: 'sun', celestialColor: '#C8443C', ambient: { kind: 'ember', color: '#d8a068', count: 24 } },
+    bg: { id: 'xingtian', sky: ['#2a1410', '#9a4a2a'], ground: '#2c1a12', silhouette: '#180c08', seed: 121, celestial: 'sun', celestialColor: '#C8443C', ambient: { kind: 'ember', color: '#d8a068', count: 24 } },
   },
   // 高老庄：秋日的晒场，全名册最"家常"的一关——他打完就回这儿吃饭
   bajie: {
     name: '高老庄',
-    bg: { sky: ['#2a2010', '#c8a04a'], ground: '#2c2416', silhouette: '#1a140a', seed: 132, celestial: 'moon', celestialColor: '#E8C98A', ambient: { kind: 'petal', color: '#e8c98a', count: 22 } },
+    bg: { id: 'bajie', sky: ['#2a2010', '#c8a04a'], ground: '#2c2416', silhouette: '#1a140a', seed: 132, celestial: 'moon', celestialColor: '#E8C98A', ambient: { kind: 'petal', color: '#e8c98a', count: 22 } },
   },
 };
 

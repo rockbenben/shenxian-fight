@@ -1,0 +1,17 @@
+{
+  "style": "Flat vector game background art, cel shaded with flat colour blocks and hard edges, subtle thick dark outline, Chinese ink-and-mineral-pigment mood, limited palette of muted earth and mineral colours, wide cinematic panorama, strong depth by layering silhouettes from dark foreground to pale distance. The distant land occupies only the LOWER HALF of the picture, the upper half is plain open sky. The very bottom edge of the picture is flat ground meeting the horizon. Empty landscape: no characters, no people, no animals, no text, no letters, no watermark, no signature, no UI elements.",
+  "stages": [
+    { "id": "nezha", "place": "the East China Sea shore at night", "detail": "rolling ocean waves in the mid distance, a pale sand spit in the foreground, distant rocky islets, a single distant sailing junk on the horizon" },
+    { "id": "erlang", "place": "a wide river gorge at dusk", "detail": "layered cliffs on both sides of a river that catches the last light, bamboo groves clinging to the slopes, a stone weir far below" },
+    { "id": "wukong", "place": "a flowery mountain of peach trees at golden hour", "detail": "green mountain ridges stacked into the distance, ancient peach trees heavy with blossom, a waterfall falling from a cliff into mist" },
+    { "id": "niumo", "place": "the mouth of a vast cavern in a demon mountain", "detail": "jagged cave walls framing the opening, glowing lava fissures in the rock, banks of ash cloud drifting across the view" },
+    { "id": "honghaier", "place": "a cavern of burning fire clouds", "detail": "black rock spires lit from below by fire, roiling clouds lit orange from underneath, cracks of magma glowing across the floor" },
+    { "id": "tieshan", "place": "a bamboo grove in green mist", "detail": "dense bamboo stands receding into fog, broad banana leaves in the foreground, mossy stone steps climbing between the stalks" },
+    { "id": "baigu", "place": "a bare grey ridge under a bone-white moon", "detail": "windswept dead trees with bare branches, bleached rock formations, a low cold fog pooling in the hollows" },
+    { "id": "houyi", "place": "a high plateau above a sea of clouds at sunset", "detail": "a stone shooting platform on a summit, ridges rising above a cloud sea, the afterglow of several suns burning along the horizon" },
+    { "id": "leizhen", "place": "a cliff under a thunderstorm", "detail": "heavy storm clouds lit from inside by lightning, wind-carved rock pillars, a torn sky of blue and charcoal" },
+    { "id": "zhongkui", "place": "a ghost gate pass at the border of the underworld", "detail": "a monumental stone archway with weathered carvings, rows of tattered ritual banners on poles, dark cypress trees, thick low mist" },
+    { "id": "xingtian", "place": "a barren wasteland under a blood-red sun", "detail": "broken stone steles half buried in dry earth, cracked earth plain, low dead ridges, a heavy oppressive red sky" },
+    { "id": "bajie", "place": "an autumn threshing yard in a farming village at dusk", "detail": "round haystacks, an earthen village wall with tiled roofs behind, a threshing floor of packed earth, warm golden light" }
+  ]
+}

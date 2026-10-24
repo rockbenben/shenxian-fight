@@ -197,23 +197,52 @@ export function GameCanvas(props: {
           if (ev.type === 'hit' && !ev.blocked) banner.showFirstAttack(ev.attacker);   // 先制
           if (ev.type === 'throw') banner.showFirstAttack(ev.attacker);
           if (ev.type === 'hit') {
-            const type = ev.blocked ? 'spark' : 'burst';
             // 反击命中单独一色：金色是普通命中，朱红是"你读对了这一招"。
             // 引擎那边多给 1.2 倍伤害和 6 帧硬直，屏幕上必须有对应的一下，否则等于没加
             const color = ev.blocked ? '#7fd4ff' : ev.counter ? '#ff6b4a' : '#ffcf5c';
-            // 普通命中按伤害分三档（轻/中/重）给不同的粒子尺寸；重档额外叠一波粒子——
-            // 池子上限 256 不动，加重的是单次爆发的量，不是无限堆量
+            // 普通命中按伤害分三档（轻/中/重）给不同的分量
             const heavyDmg = ev.damage >= 16, midDmg = !heavyDmg && ev.damage >= 10;
-            fx.spawn(type, ev.x, ev.y, { color, size: heavyDmg ? 11 : midDmg ? 8 : 6 });
-            if (heavyDmg) fx.spawn(type, ev.x, ev.y, { color, size: 7 });
-            if (ev.counter) fx.spawn('shockwave', ev.x, ev.y, { color: '#ff8a5c', size: 9 });
-            cam.addShake(ev.heavy ? 14 : ev.counter ? 11 : ev.damage >= 12 ? 9 : 5);
+            // **受力方向**：攻击者的朝向就是这一下的方向。有了方向，命中才有"方向"——
+            // 之前只有一圈对称炸开的粒子，读起来像放烟火，不像被打中。
+            const dir = (ev.attacker === 0 ? battle.p1 : battle.p2).facing;
+            const ang = dir > 0 ? 0 : Math.PI;
+            // 多段连打的最后一下要更响：前面每一下都一样轻的话，玩家只觉得是同一个动画在循环
+            const fin = ev.final === true;
+            if (!ev.blocked) {
+              // 接触点闪光：最亮的那一下（最后一下更大）
+              fx.spawn('hitflash', ev.x, ev.y, {
+                color: '#fff', size: (heavyDmg ? 17 : midDmg ? 13 : 10) * (fin ? 1.3 : 1),
+              });
+              // 沿受力方向甩出的亮片。**不用那一圈"炸开"的圆点**：深色场景里十几颗
+              // 实心圆读成一颗颗气泡，而亮片才读成迸溅的火星——街机格斗的命中火花就是这个形
+              fx.spawn('shard', ev.x, ev.y, {
+                color, size: heavyDmg ? 4.6 : 3.2, angle: ang,
+                count: (heavyDmg ? 12 : midDmg ? 9 : 6) + (fin ? 3 : 0), spread: 1.1,
+              });
+              // 压扁的冲击环：环是圆的读作"气"，压扁的才读作"被推出去"
+              fx.spawn('impactring', ev.x, ev.y, { color, size: heavyDmg ? 9 : 6, angle: ang, sq: 0.42 });
+            } else {
+              // 挡住了：只有一小团冷色闪光，没有火花也没有环——挡下来的力是卸掉的
+              fx.spawn('hitflash', ev.x, ev.y, { color: '#bfe8ff', size: 8 });
+              fx.spawn('spark', ev.x, ev.y, { color, size: 4 });
+            }
+            cam.addShake((ev.heavy ? 14 : ev.counter ? 11 : ev.damage >= 12 ? 9 : 5) * (fin ? 1.4 : 1));
             if (ev.heavy) { // 大招命中：冲击波、白闪时长都比普通重击再加一档
               fx.spawn('shockwave', ev.x, ev.y, { color: '#ffe6a3', size: 16 });
               fx.spawn('flash', 0, 0, { color: '#fff', size: 6 }); // size 复用为白闪多维持的 tick 数
               cine.slow = 10; cine.slowCounter = 0;
             }
-          } else if (ev.type === 'throw') { cam.addShake(10); }
+          } else if (ev.type === 'throw') {
+            // 投技是"整个人被摔出去"的一下，比普通命中更重：给一个比普通命中更大的接触闪光
+            // 与一圈亮片。此前这里只有震屏，屏幕上看不出"抓住了"
+            cam.addShake(10);
+            const atk = ev.attacker === 0 ? battle.p1 : battle.p2;
+            const vic = ev.attacker === 0 ? battle.p2 : battle.p1;
+            const bx = (atk.x + vic.x) / 2, by = FLOOR_Y - (atk.y + vic.y) / 2 - atk.def.height / 2;
+            fx.spawn('hitflash', bx, by, { color: '#fff', size: 20 });
+            fx.spawn('shard', bx, by, { color: '#ffd9a0', size: 4, count: 9, spread: 1.5 });
+            fx.spawn('impactring', bx, by, { color: '#ffd9a0', size: 10, angle: atk.facing > 0 ? 0 : Math.PI, sq: 0.5 });
+          }
           // 守方翻盘的三件事：受身、投技解脱、防御取消。此前渲染层一个都不接——
           // 与爆气当初的毛病一样，"看不见的系统等于不存在"。
           // 统一用青白色的冲击波：跟命中的金色/朱红分开，一眼能认出"这是脱出来了"，
