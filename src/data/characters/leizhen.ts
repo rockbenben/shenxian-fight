@@ -58,7 +58,7 @@ export const LEIZHEN: CharacterDef = {
   // 头身比：内容框 70×123、脸 34×35（源像素，量的——工具见 scripts/measure-heads.py）——
   // 长喙把整颗头撑得又窄又高（框宽只有 70，是十二人里最窄的）。
   // 归一只用一条锚（内容盒高 = 头高），脸只管横向挂点与下巴接缝。
-  build: { rig: { k: 0.22, chinY: 126.3, shoulderY: 120.1, hipY: 38.5, shoulderDx: -27.75, backShoulderDx: 22.41, backArm: true, headDx: 9.224, legFDx: 12.8, legBDx: -2.931, footAnchorX: 0.1962, face: [60, 84, 42, 40], upperArm: 35.42, lowerArm: 15.4, handLen: 12.32, thigh: 12.87, shin: 12.87, torsoLen: 87.78, armOv: 4.686, legOv: 3.514 }, shoulderDx: -11.7, shoulderDy: 5.2, arm: 1.0, leg: 1.0, hand: 'fist', sleeve: 'bracer', face: [60, 60, 34, 35], head: 1.0 },
+  build: { rig: { k: 0.22, chinY: 120.1, shoulderY: 115.5, hipY: 43.12, shoulderDx: -18.15, backShoulderDx: 15.08, backArm: true, deco: { part: 'wing', dx: -36.44, y: 154 }, headDx: 2.187, legFDx: 1.294, legBDx: -9.926, footAnchorX: 0.1986, face: [16, 100, 51, 54], upperArm: 30.8, lowerArm: 26.18, handLen: 9.24, thigh: 13.53, shin: 13.53, torsoLen: 77, armOv: 2.545, legOv: 5.678 },   shoulderDx: -11.7, shoulderDy: 5.2, arm: 1.0, leg: 1.0, hand: 'fist', sleeve: 'bracer', face: [60, 60, 34, 35], head: 1.0 },
   weapon: { kind: 'mace', len: 88, grip: 0.42, shaft: '#3a4a6b', edge: '#8fd0ff' }, // 黄金棍
   adorn: {
     // 真的一对翅膀，不再拿飘带假装。此前是两条同挂肩上的 154px 飘带，注释写着
