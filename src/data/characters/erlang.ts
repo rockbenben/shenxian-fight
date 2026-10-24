@@ -63,7 +63,7 @@ export const ERLANG: CharacterDef = {
   // 头身比：内容框 77×124、脸 42×65（源像素，量的——工具见 scripts/measure-heads.py）。
   // 天冠把框撑得又高又窄（脸只占框宽的一半多），但归一只用一条锚（内容盒高 = 头高），
   // 脸只管横向挂点与下巴接缝——天冠与脸同比例缩放，不会被拉成一条竖板。
-  build: { rig: { k: 0.22, chinY: 120.1, shoulderY: 114, hipY: 23.1, shoulderDx: -20.94, backShoulderDx: 16.68, headDx: -1.144, legFDx: 8.646, legBDx: -11.15, footAnchorX: 0.5871, face: [46, 80, 55, 74], upperArm: 33.88, lowerArm: 15.4, handLen: 15.4, thigh: 4.84, shin: 4.84, torsoLen: 97.02 }, shoulderDx: -14.0, shoulderDy: 4.7, arm: 0.95, leg: 0.95, hand: 'fist', sleeve: 'bracer', face: [59, 38, 42, 65], head: 1.0 },
+  build: { rig: { k: 0.22, chinY: 120.1, shoulderY: 114, hipY: 23.1, shoulderDx: -19.1, backShoulderDx: 21.6, backArm: true, headDx: 0.704, legFDx: 10.6, legBDx: -9.526, footAnchorX: 0.5871, face: [46, 80, 55, 74], upperArm: 33.88, lowerArm: 15.4, handLen: 15.4, thigh: 4.84, shin: 4.84, torsoLen: 97.02, armOv: 3.388, legOv: 2.926 }, shoulderDx: -14.0, shoulderDy: 4.7, arm: 0.95, leg: 0.95, hand: 'fist', sleeve: 'bracer', face: [59, 38, 42, 65], head: 1.0 },
   weapon: { kind: 'glaive', len: 104, grip: 0.3, shaft: '#4a5a7a', edge: '#dfe8ff' }, // 三尖两刃刀
   adorn: {
     // 战袍后摆：长而挺，摆动比哪吒的绫子沉

@@ -50,7 +50,7 @@ export const NEZHA: CharacterDef = {
   // 归一只有一条锚：**内容盒高就是头高**（契约保证头填满画幅），脸不再当尺子，
   // 只管两件事——横向挂点（脸心对齐身体中轴）与下巴到画幅底边的距离（脖子接缝）。
   // 1.12 是特质倍率：小孩的头本来就该比大人显眼。
-  build: { rig: { k: 0.22, chinY: 112.4, shoulderY: 107.8, hipY: 43.12, shoulderDx: -18.15, backShoulderDx: 9.02, headDx: -4.84, legFDx: 4.51, legBDx: -9.79, footAnchorX: 0.3508, face: [43, 82, 126, 104], upperArm: 30.8, lowerArm: 15.4, handLen: 12.32, thigh: 14.96, shin: 15.18, torsoLen: 69.3 }, shoulderDx: -11.2, shoulderDy: 3.8, arm: 0.85, leg: 0.85, hand: 'fist', sleeve: 'none', face: [55, 40, 52, 59], head: 1.12 },
+  build: { rig: { k: 0.22, chinY: 112.4, shoulderY: 107.8, hipY: 43.12, shoulderDx: -18.26, backShoulderDx: 15.25, headDx: -4.84, legFDx: 4.51, legBDx: -9.79, footAnchorX: 0.3508, face: [43, 82, 126, 104], upperArm: 30.8, lowerArm: 15.4, handLen: 12.32, thigh: 15.07, shin: 15.07, torsoLen: 69.3, armOv: 2.475, legOv: 2.846 }, shoulderDx: -11.2, shoulderDy: 3.8, arm: 0.85, leg: 0.85, hand: 'fist', sleeve: 'none', face: [55, 40, 52, 59], head: 1.12 },
   weapon: { kind: 'spear', len: 96, grip: 0.28, shaft: '#8a5a3a', edge: '#ff8c2b' }, // 火尖枪
   adorn: {
     // 混天绫：肩上一条长红绫，是哪吒最有辨识度的一件东西

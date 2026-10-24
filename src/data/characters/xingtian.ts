@@ -53,7 +53,7 @@ export const XINGTIAN: CharacterDef = {
   // 体型：四肢粗细 / 手形 / 装束。巨人：断首之后只剩更粗的臂膀来压人。
   // 此前十二个人共用同一套四肢几何（同样粗、同样一颗圆手），只有颜色不同——
   // 于是十二个人看着像同一副假人换了个色。
-  build: { rig: { k: 0.22, chinY: 84.7, shoulderY: 114, hipY: 50.16, shoulderDx: -36.17, backShoulderDx: 47.19, headDx: 0.9284, legFDx: 12.65, legBDx: -10.45, footAnchorX: 0.5493, face: [29, 232, 194, 83], upperArm: 32.34, lowerArm: 12.32, handLen: 16.94, thigh: 19.14, shin: 19.14, torsoLen: 34.54 }, shoulderDx: -14.2, shoulderDy: 4.9, arm: 1.4, leg: 1.4, hand: 'fist', sleeve: 'none' },
+  build: { rig: { k: 0.22, chinY: 84.7, shoulderY: 114, hipY: 50.16, shoulderDx: -36.17, backShoulderDx: 34.8, backArm: true, headDx: 0.9284, legFDx: 12.98, legBDx: -10.67, footAnchorX: 0.5493, face: [29, 232, 194, 83], upperArm: 32.34, lowerArm: 12.32, handLen: 16.94, thigh: 19.14, shin: 19.14, torsoLen: 34.54, armOv: 5.73, legOv: 7.474 }, shoulderDx: -14.2, shoulderDy: 4.9, arm: 1.4, leg: 1.4, hand: 'fist', sleeve: 'none' },
   weapon: { kind: 'axe', len: 96, grip: 0.34, shaft: '#5a3a2a', edge: '#b08d57' }, // 戚（斧）
   adorn: {
     sashes: [
