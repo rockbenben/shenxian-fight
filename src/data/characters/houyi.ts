@@ -74,7 +74,7 @@ export const HOUYI: CharacterDef = {
   // 于是十二个人看着像同一副假人换了个色。
   // 头身比：内容框 83×124、脸 45×43（源像素，量的——工具见 scripts/measure-heads.py）。
   // 归一只用一条锚（内容盒高 = 头高），脸只管横向挂点与下巴接缝。
-  build: { rig: { k: 0.2292, chinY: 117, shoulderY: 110.9, hipY: 14.21, shoulderDx: -18.1, backShoulderDx: 16.63, headDx: -4.858, legFDx: 11.47, legBDx: -8.921, footAnchorX: 0.0917, face: [69, 54, 52, 46], upperArm: 29.33, lowerArm: 16.96, handLen: 11, thigh: 0.9167, shin: 0.6875, torsoLen: 102.8 }, shoulderDx: -17.2, shoulderDy: 5.1, arm: 1.0, leg: 1.0, hand: 'fist', sleeve: 'bracer', face: [58, 39, 45, 43], head: 1.0 },
+  build: { rig: { k: 0.2292, chinY: 117, shoulderY: 110.9, hipY: 52.36, shoulderDx: -18.1, backShoulderDx: 16.63, headDx: -4.858, legFDx: 6.089, legBDx: -10.41, footAnchorX: 0.0917, face: [69, 54, 52, 46], upperArm: 29.33, lowerArm: 16.96, handLen: 11, thigh: 16.04, shin: 16.27, torsoLen: 64.68 }, shoulderDx: -17.2, shoulderDy: 5.1, arm: 1.0, leg: 1.0, hand: 'fist', sleeve: 'bracer', face: [58, 39, 45, 43], head: 1.0 },
   // 弓：借 staff 的画法（一根长杆），但握点在正中、颜色是深褐弓身
   weapon: { kind: 'bow', len: 104, grip: 0.5, shaft: '#6b4a2f', edge: '#ffb340' }, // 震天弓
   adorn: {

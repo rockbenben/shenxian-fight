@@ -101,17 +101,21 @@ def substantial_runs(row, W, min_frac=0.03):
     return out
 
 
-def is_split(row, W, gap_frac=0.03):
-    """这一行算不算"两条腿分开了"：要有两段够宽的、且**中间那道缝够宽**。
+def is_split(row, W, gap_frac=0.03, gap_max=0.06):
+    """这一行算不算"两条腿分开了"：要有两段够宽的、且**中间那道缝够宽又不太宽**。
 
     为什么还要看缝：脚趾之间的缝只有一两个像素，按"段数≥2"判，脚底就成立，
     衣摆下沿会被量到脚趾尖上（实测 99.6%，差了一整条腿）。
+    为什么还要看缝的上限：刑天那样魁梧的角色，**手臂与身体之间**也有一道缝，
+    按"有缝就算分叉"会量到 32% 处（那不是腿根，是腋下）。腿之间的缝窄，
+    手臂与身体之间的缝宽——给个上限就分得开了。
     """
     rs = substantial_runs(row, W, 0.02)
     if len(rs) < 2:
         return False
     gaps = [rs[i + 1][0] - rs[i][1] for i in range(len(rs) - 1)]
-    return max(gaps) >= W * gap_frac
+    g = max(gaps)
+    return W * 0.004 <= g <= W * gap_max
 
 
 def detect_hem(alpha, W, H):
@@ -193,6 +197,27 @@ def flood_mask(im, seed, outline_lum=OUTLINE_LUM):
     return lab == v
 
 
+def color_mask(im, seed, tol=46):
+    """按**颜色**取一块：与种子点同色的连通域。
+
+    为什么需要它：猪八戒、牛魔王的胳膊**贴着肚子**，画里没有缝可分——
+    连通域（按描边分）对深肤色角色直接失效（肤色比描边阈值还暗，整条胳膊成了墙）。
+    但胳膊的**肤色**与袍子不同，按颜色分就分得开。
+    代价：描边不在"同色"里，胳膊外缘的黑边会被吃掉一点（手臂略淡）。
+    """
+    from scipy import ndimage
+    arr = np.array(im.convert('RGB')).astype(int)
+    r0, g0, b0 = arr[seed[1], seed[0]]
+    d = np.max(np.abs(arr - np.array([r0, g0, b0])), axis=2)
+    m = d <= tol
+    m &= (np.array(im.getchannel('A')) > 8)
+    lab, n = ndimage.label(m, structure=np.ones((3, 3)))
+    v = lab[seed[1], seed[0]]
+    if v == 0:
+        return None
+    return lab == v
+
+
 def trim_box(im, threshold=10):
     """内容包围盒。阈值与 src/render/parts.ts 的 trimBox 一致（10）——
     两边裁得不一样，渲染层算出的宽高就和这里对不上，贴图会被抻。"""
@@ -254,10 +279,11 @@ def cut_one(cid, spec, verbose=True):
         spec = dict(spec)
         hem_row = detect_hem(alpha, W, H)
         hem_pct = hem_row / H * 100
-        # 量出来的不合理（贴到脚底或高过腰）就退回规格表里写的：
-        # 自动量在"两条腿并在一起"（脚背相碰）时会失效。
-        if not (25 < hem_pct < 93):
-            print(f'  （衣摆自动量得 {hem_pct:.1f}%，不合理，用规格表里的 {spec["hip"]}%）')
+        # 自动量是**校正**，规格表是**基准**：两者差太多就以规格表为准。
+        # 自动量在几种画上不成立——脚背相碰（两条腿并成一段）、手臂与身体之间
+        # 也有一道缝（量到腋下而不是腿根），实测能差出 20% 身位。
+        if abs(hem_pct - spec['hip']) > 8 or not (25 < hem_pct < 93):
+            print(f'  （衣摆自动量得 {hem_pct:.1f}%，与规格表的 {spec["hip"]:.0f}% 差太远，用规格表的）')
         else:
             spec['hip'] = hem_pct
         spec['ankle'] = detect_ankle(alpha, W, H, int(spec['hip'] / 100 * H)) / H * 100
@@ -266,7 +292,7 @@ def cut_one(cid, spec, verbose=True):
         # 脚那一块的横向：踝两侧各留一点
         leg0, leg1 = spec['leg']
         spec['foot'] = [max(0, leg0 - 3), min(100, leg1 + 3)]
-        print(f'  自动量：衣摆 {spec["hip"]:.1f}%  膝 {spec["knee"]:.1f}%  踝 {spec["ankle"]:.1f}%')
+        print(f'  衣摆 {spec["hip"]:.1f}%  膝 {spec["knee"]:.1f}%  踝 {spec["ankle"]:.1f}%')
 
     # 身体中轴：躯干裁切框的中心。手臂切线要靠它认出「紧挨躯干的那一段」
     # （哪吒的混天绫飘在手臂左边，"最左边那一段"会把它圈进来）。
@@ -313,19 +339,32 @@ def cut_one(cid, spec, verbose=True):
                 ('armFL', spec['elbow'], spec['wrist'], spec.get('armFL', spec['arm'])),
                 ('handF', spec['wrist'], spec['handEnd'], spec.get('handF', spec['arm']))]
     arm_mask = None
-    if spec.get('armMask', False):
-        # 只有"手臂压在别的东西上"的角色才抠（雷震子的翅膀）。
+    arm_mode = spec.get('armMask', False)
+    if arm_mode:
+        # 只有"手臂压在别的东西上"的角色才抠（猪八戒的胳膊贴着肚子、牛魔王的贴着甲、
+        # 雷震子的压着翅膀、哪吒的压着混天绫）。按描边分对深肤色角色失效，
+        # 按颜色分才分得开——胳膊的肤色与袍子不同。
         elbow_y = int(Y(spec['elbow']))
         seed = None
-        for a, b in substantial_runs(alpha[elbow_y], W, 0.02):
+        rs = substantial_runs(alpha[elbow_y], W, 0.02)
+        body_i = None
+        for i, (a, b) in enumerate(rs):
+            if a <= axis_px <= b:
+                body_i = i
+                break
+        if body_i is not None and body_i > 0:
+            a, b = rs[body_i - 1]
             seed = ((a + b) // 2, elbow_y)
-            break
+        elif rs:
+            a, b = rs[0]
+            seed = ((a + b) // 2, elbow_y)
         if seed is None:
             seed = (X((spec['arm'][0] + spec['arm'][1]) / 2), elbow_y)
-        arm_mask = flood_mask(im, seed)
+        arm_mask = color_mask(im, seed) if arm_mode == 'color' else flood_mask(im, seed)
         if arm_mask is not None:
             from scipy import ndimage
-            arm_mask = ndimage.binary_dilation(arm_mask, np.ones((5, 5), bool), iterations=1)
+            # 描边不在"同色"里，胀 2 像素把它捞回来（不然手臂外缘没有黑边，看着发白）
+            arm_mask = ndimage.binary_dilation(arm_mask, np.ones((5, 5), bool), iterations=2)
             xs = np.where(arm_mask.any(axis=0))[0]
             if len(xs):
                 ax0 = max(0, xs.min() - 1) / W * 100
