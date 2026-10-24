@@ -67,7 +67,7 @@ export const WUKONG: CharacterDef = {
   // 脸 39×43（源像素，量的——工具见 scripts/measure-heads.py）。
   // 脸比哪吒小是**角色设计**（猴王脸小、小孩脸大），不该靠缩放抹平；
   // 归一只有一条锚：内容盒高就是头高，脸只管横向挂点与下巴接缝。
-  build: { rig: { k: 0.22, chinY: 120.1, shoulderY: 112.4, hipY: 43.12, shoulderDx: -23.06, backShoulderDx: 14.96, headDx: -0.044, legFDx: 3.96, legBDx: -14.96, footAnchorX: 0.2955, face: [73, 68, 83, 86], upperArm: 27.72, lowerArm: 18.48, handLen: 16.94, thigh: 11.88, shin: 12.1, torsoLen: 77 }, shoulderDx: -13.4, shoulderDy: 3.1, arm: 1.05, leg: 1.05, hand: 'claw', sleeve: 'fur', face: [71, 56, 39, 43], head: 1.0 },
+  build: { rig: { k: 0.22, chinY: 120.1, shoulderY: 112.4, hipY: 43.12, shoulderDx: -22.29, backShoulderDx: 14.96, headDx: -0.044, legFDx: 3.96, legBDx: -14.96, footAnchorX: 0.2955, face: [73, 68, 83, 86], upperArm: 27.72, lowerArm: 18.48, handLen: 16.94, thigh: 11.88, shin: 12.1, torsoLen: 77 }, shoulderDx: -13.4, shoulderDy: 3.1, arm: 1.05, leg: 1.05, hand: 'claw', sleeve: 'fur', face: [71, 56, 39, 43], head: 1.0 },
   weapon: { kind: 'staff', len: 118, grip: 0.5, shaft: '#c9862b', edge: '#ffd23f' }, // 如意金箍棒
   adorn: {
     // 虎皮裙的两条系带 + 筋斗云的余絮

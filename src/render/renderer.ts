@@ -821,7 +821,7 @@ function poseFor(f: Fighter): Pose {
  * 只取 part.top..part.bottom 这段内容行（parts.ts 已裁掉上下透明留白），横向仍是整张图——
  * 素材自带的留白多少不再影响这一段贴图实际画出来有多高，接缝就不再随素材抖动。
  */
-export function drawBoneImg(ctx: CanvasRenderingContext2D, x: number, y: number, ex: number, ey: number, w: number, part: PartImage, white: boolean, facing: number) {
+export function drawBoneImg(ctx: CanvasRenderingContext2D, x: number, y: number, ex: number, ey: number, w: number, part: PartImage, white: boolean, facing: number, topExtend = 0) {
   const dx = ex - x, dy = ey - y;
   const len = Math.hypot(dx, dy) || 1;
   ctx.save();
@@ -835,8 +835,11 @@ export function drawBoneImg(ctx: CanvasRenderingContext2D, x: number, y: number,
   // 同一个根因被绕了两次。裁了之后 w*2 就是躯干真实宽度，头躯比例才真的是同一个。
   const { top, bottom, left, right } = part;
   const sw = Math.max(1, right - left), sh = Math.max(1, bottom - top);
-  if (white) drawWhitePart(ctx, part, left, top, sw, sh, -w, 0, w * 2, len);
-  else ctx.drawImage(part.img, left, top, sw, sh, -w, 0, w * 2, len);
+  // topExtend：把这一块往上伸出一截（肩头的三角肌），底端仍落在骨段末端。
+  // 伸出去的量与块的自然长度对应，宽高比不变——只是这块的**支点**在下面那截。
+  const dy0 = -topExtend, dh = len + topExtend;
+  if (white) drawWhitePart(ctx, part, left, top, sw, sh, -w, dy0, w * 2, dh);
+  else ctx.drawImage(part.img, left, top, sw, sh, -w, dy0, w * 2, dh);
   ctx.restore();
 }
 
@@ -1826,7 +1829,8 @@ function drawDollLimbs(
 
   // ---- 后侧肢体：先画，被躯干盖住 ----------------------------------------
   const armB = backArmFor(p, x, feetY, fc, weapon, build, rig) ?? p.armB;
-  seg(ctx, a.bshX, a.bshY, armB[0], upperArm, segHalfW(armFU), 0, fc, '', armFU, white);
+  const bUpExt = Math.max(0, (armFU.bottom - armFU.top) * k - upperArm);
+  seg(ctx, a.bshX, a.bshY, armB[0], upperArm, segHalfW(armFU), 0, fc, '', armFU, white, bUpExt);
   const bElbow = segEnd(a.bshX, a.bshY, armB[0], upperArm, fc);
   seg(ctx, bElbow[0], bElbow[1], armB[0] + armB[1], lowerArm, segHalfW(armFL), 0, fc, '', armFL, white);
   const bHand = segEnd(bElbow[0], bElbow[1], armB[0] + armB[1], lowerArm, fc);
@@ -1864,6 +1868,12 @@ function drawDollLimbs(
   const fKnee = seg(ctx, a.hipX + (rig.legFDx ?? 0) * fc, a.hipY, p.legF[0], thigh, segHalfW(legFU), 0, fc, '', legFU, white);
   const fAnk = seg(ctx, fKnee[0], fKnee[1], p.legF[0] - p.legF[1], shin, segHalfW(legFL), 0, fc, '', legFL, white);
   drawDollFoot(ctx, fAnk, fc, footF, k, rig.footAnchorX, white);
+
+  // 上臂块比骨段长出来的那一截是**三角肌**（肩头）。它必须画在肩关节**之上**，
+  // 绕着肩关节转——否则肩头就是一道平口，而且抬手时三角肌不会跟着肩膀转。
+  // 办法：把这一块往上伸（画在骨段起点的上方），块的底端仍然落在肘上。
+  const upExt = Math.max(0, (armFU.bottom - armFU.top) * k - upperArm);
+  seg(ctx, a.nshX, a.nshY, p.armF[0], upperArm, segHalfW(armFU), 0, fc, '', armFU, white, upExt);
 
   // ---- 兵器：在躯干与腿**之后**、在手之前 --------------------------------
   // 为什么与旧管线相反：旧管线里兵器压在躯干之前，是因为那柄枪横过胸口，
@@ -1912,11 +1922,11 @@ function drawDollFoot(
  * 每帧要走八次，不该让渲染的正确性挂在替身身上。 */
 function seg(
   ctx: CanvasRenderingContext2D, x: number, y: number, angle: number, len: number, r1: number, r2: number, facing: number,
-  fill: string, img?: PartImage, white = false,
+  fill: string, img?: PartImage, white = false, topExtend = 0,
 ): [number, number] {
   const [ex, ey] = segEnd(x, y, angle, len, facing);
   if (img) {
-    drawBoneImg(ctx, x, y, ex, ey, r1, img, white, facing);
+    drawBoneImg(ctx, x, y, ex, ey, r1, img, white, facing, topExtend);
   } else {
     ctx.fillStyle = white ? '#fff' : limbGrad(ctx, x, y, ex, ey, r1 * 2, fill);
     // capStart=false：起点圆帽不描边，肘/膝上那道横贯的黑带就没了（原因见 fillTapered）

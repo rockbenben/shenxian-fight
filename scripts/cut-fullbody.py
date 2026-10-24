@@ -317,6 +317,10 @@ def cut_one(cid, spec, verbose=True):
     arm_segs = [('armFU', spec['shoulder'], spec['elbow'], spec.get('armFU', spec['arm'])),
                 ('armFL', spec['elbow'], spec['wrist'], spec.get('armFL', spec['arm'])),
                 ('handF', spec['wrist'], spec['handEnd'], spec.get('handF', spec['arm']))]
+    # 上臂那一块从**肩顶**开始（比肩关节高 3%）：三角肌是肩头，缺了它，肩上就是一道
+    # 平口。渲染层会把多出来的这一截往上伸（见 renderer 的 drawDollLimbs），
+    # 所以块的自然长度比骨段长，骨段长度仍按解剖量（肩关节→肘）。
+    arm_segs[0] = ('armFU', spec['shoulder'] - 3, spec['elbow'], arm_segs[0][3])
     arm_mask = None
     arm_mode = spec.get('armMask', False)
     if arm_mode:
@@ -426,8 +430,9 @@ def cut_one(cid, spec, verbose=True):
     head_c_px = X(spec['head'][0]) + (head_box[0] + head_box[2]) / 2
     rig['headDx'] = (head_c_px - axis_px) * k
 
-    # 骨段长度：取**切出来那一块**的高（渲染层会把它拉满整段骨长，两者必须相等）
-    rig['upperArm'] = rig['armFU']['h']
+    # 骨段长度：上臂按**解剖**量（肩关节→肘）——那一块多出来的一截是三角肌，
+    # 渲染层会把它往上伸（不是骨段变长）。其余各段就是切出来那一块的高。
+    rig['upperArm'] = (spec['elbow'] - spec['shoulder']) / 100 * H * k
     rig['lowerArm'] = rig['armFL']['h']
     rig['handLen'] = rig['handF']['h']
     rig['thigh'] = rig['legFU']['h']

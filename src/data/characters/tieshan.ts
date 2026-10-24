@@ -62,7 +62,7 @@ export const TIESHAN: CharacterDef = {
   // 头身比：内容框 92×123、脸 60×69（源像素，量的——工具见 scripts/measure-heads.py）——
   // 高髻把头顶撑高，她的脸反而占了大半张脸。
   // 归一只用一条锚（内容盒高 = 头高），脸只管横向挂点与下巴接缝。
-  build: { rig: { k: 0.22, chinY: 117, shoulderY: 110.9, hipY: 15.4, shoulderDx: -14.48, backShoulderDx: 10.85, headDx: -2.768, legFDx: 0, legBDx: 0, footAnchorX: 0.2436, face: [52, 87, 88, 81], upperArm: 29.26, lowerArm: 15.4, handLen: 12.32, thigh: 3.74, shin: 3.74, torsoLen: 101.6 }, shoulderDx: -15.8, shoulderDy: 4.4, arm: 0.8, leg: 0.85, hand: 'fist', sleeve: 'cuff', face: [49, 38, 60, 69], head: 1.0 },
+  build: { rig: { k: 0.22, chinY: 117, shoulderY: 110.9, hipY: 15.4, shoulderDx: -14.26, backShoulderDx: 10.85, headDx: -2.768, legFDx: 0, legBDx: 0, footAnchorX: 0.2436, face: [52, 87, 88, 81], upperArm: 29.26, lowerArm: 15.4, handLen: 12.32, thigh: 3.74, shin: 3.74, torsoLen: 101.6 }, shoulderDx: -15.8, shoulderDy: 4.4, arm: 0.8, leg: 0.85, hand: 'fist', sleeve: 'cuff', face: [49, 38, 60, 69], head: 1.0 },
   // 芭蕉扇：全场唯一不靠杆长吃饭的兵器——扇面是**横着张开**的，攻程来自风不是杆
   weapon: { kind: 'fan', len: 62, grip: 0.22, shaft: '#5a7a6a', edge: '#eef3ea' },
   adorn: {
