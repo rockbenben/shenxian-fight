@@ -25,22 +25,14 @@ CELL_W, CELL_H = 480, 536      # 截图里的格子（dpr 2 → 240x268 逻辑�
 DPR = 2
 FIG_H = 154.0                  # 整高（逻辑单位）
 
-
-def is_magenta(r, g, b):
-    return r > 110 and b > 110 and g < min(r, b) * 0.72
-
-
-def load_clean(path):
-    im = Image.open(path).convert('RGBA')
-    px = im.load()
-    W, H = im.size
-    for y in range(H):
-        for x in range(W):
-            r, g, b, a = px[x, y]
-            if a > 0 and is_magenta(r, g, b):
-                px[x, y] = (0, 0, 0, 0)
-    bb = im.getbbox()
-    return im.crop(bb) if bb else im
+# 原画的清理**必须与切件脚本同一份**：rig 里的 axisX 是切件脚本那份坐标系的像素值，
+# 两份清理不一致（这里原来自己写了一份，不删与画幅边缘相连的连通域），
+# 内容框就不同 → 中轴对不上 → 叠图整体横移，看着像「纸偶挂歪了」。
+# 这个工具是对齐检查器：它自己歪了，就等于没有。
+import importlib.util as _ilu
+_cs = _ilu.spec_from_file_location('cf', os.path.join(ROOT, 'scripts', 'cut-fullbody.py'))
+_cf = _ilu.module_from_spec(_cs); _cs.loader.exec_module(_cf)
+load_clean = _cf.load_clean
 
 
 def main():
