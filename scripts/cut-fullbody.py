@@ -48,13 +48,13 @@ def is_magenta(r, g, b):
     return r > 110 and b > 110 and g < min(r, b) * 0.72
 
 
-def load_clean(path, max_h=700, keep_border=False):
+def load_clean(path, max_h=512, keep_border=False):
     """读原图，抠掉背景，裁到内容框；**并把高度压到 max_h**。
 
     为什么压：原图是 2K（1696×2528），切出来的躯干那一块能有 1000 多像素高。
     角色在屏幕上只有 ~154 逻辑单位高（dpr 2 也就 300 多像素），按原分辨率切，
     十一个人全套就是 16MB 的 PNG—— precache 进去每个玩家白下载。
-    压到 700 高（约为屏幕的 2.3 倍）画质绰绰有余，体积降到 1/13。
+    压到 512 高（约为屏幕的 1.5 倍）画质绰绰有余，体积降到 2.5MB。
 
     背景怎么抠：**删掉与画面边缘相连的连通域**，而不是按颜色判。
     牛魔王那张的背景是带噪点的深品红（#B72F71 一带），按颜色判会漏下一片噪点，
@@ -297,11 +297,21 @@ def cut_one(cid, spec, verbose=True):
         # 自动量是**校正**，规格表是**基准**：两者差太多就以规格表为准。
         # 自动量在几种画上不成立——脚背相碰（两条腿并成一段）、手臂与身体之间
         # 也有一道缝（量到腋下而不是腿根），实测能差出 20% 身位。
-        if abs(hem_pct - spec['hip']) > 8 or not (25 < hem_pct < 93):
+        #
+        # 阈值收到 4%：自动量**随分辨率变**——背景噪点的连通性在缩放后不一样，
+        # 量到的行会差好几行（牛魔王在 700 高时量到 65%，512 高时量到 73%，
+        # 差 7.8% 正好落在旧的 8% 阈值里，把规格表手调的 81% 覆盖了，
+        # 于是躯干短了一截、腿与靴子之间裂开一道白缝）。
+        # 阈值放宽等于让噪点决定切线——这正是这一条要防的。
+        if abs(hem_pct - spec['hip']) > 4 or not (25 < hem_pct < 93):
             print(f'  （衣摆自动量得 {hem_pct:.1f}%，与规格表的 {spec["hip"]:.0f}% 差太远，用规格表的）')
         else:
             spec['hip'] = hem_pct
+        # 踝同理：规格表里的值是基准，自动量只在差得不多时校正
+        spec_ankle = spec['ankle']
         spec['ankle'] = detect_ankle(alpha, W, H, int(spec['hip'] / 100 * H)) / H * 100
+        if abs(spec['ankle'] - spec_ankle) > 4:
+            spec['ankle'] = spec_ankle
         # 膝盖取腿中点（画里腿几乎是直的，中点就是膝盖）
         spec['knee'] = (spec['hip'] + spec['ankle']) / 2
         # 脚那一块的横向：踝两侧各留一点

@@ -63,7 +63,7 @@ export const BAJIE: CharacterDef = {
   // 整颗头几乎就是脸（猪头，两只大耳朵也占在框里）。
   // 归一只用一条锚（内容盒高 = 头高），脸只管挂点与接缝；0.92 是特质倍率：
   // 他是十二人里身子最肥的，头小才读得出是「一头猪撞在肉山上」，头大了就成了穿西装的猪。
-  build: { rig: { k: 0.22, chinY: 112.4, shoulderY: 107.8, hipY: 14.74, shoulderDx: -33.17, backShoulderDx: 28.64, headDx: -6.853, legFDx: 5.973, legBDx: -18.23, footAnchorX: 0.2195, face: [28, 60, 179, 114], upperArm: 27.72, lowerArm: 13.86, handLen: 13.86, thigh: 2.2, shin: 2.2, torsoLen: 97.68, armOv: 3.534, legOv: 3.742 }, shoulderDx: -17.1, shoulderDy: 2.7, arm: 1.45, leg: 1.35, hand: 'paw', sleeve: 'cuff', face: [12, 37, 91, 70], head: 0.92 },
+  build: { rig: { k: 0.3008, chinY: 112.4, shoulderY: 107.8, hipY: 15.04, shoulderDx: -33.29, backShoulderDx: 27.99, headDx: -6.557, legFDx: 10.62, legBDx: -16.75, footAnchorX: 0.2193, face: [21, 44, 131, 83], upperArm: 27.72, lowerArm: 13.86, handLen: 13.86, thigh: 5.21, shin: 5.21, torsoLen: 97.38, armOv: 3.528, legOv: 3.736 },   shoulderDx: -17.1, shoulderDy: 2.7, arm: 1.45, leg: 1.35, hand: 'paw', sleeve: 'cuff', face: [12, 37, 91, 70], head: 0.92 },
   weapon: { kind: 'rake', len: 100, grip: 0.44, shaft: '#5a4028', edge: '#9aa0a6' }, // 九齿钉耙
   adorn: {
     sashes: [
