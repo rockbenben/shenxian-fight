@@ -39,7 +39,8 @@ export type DollParts = Partial<Record<PartName, PartImage>>;
 
 export type PartImages = Partial<Record<PartName, PartImage>> & {
   /**
-   * 纸偶件。用 ?doll=1 打开，两套并存便于 A/B 对比（见 renderer 的 drawDollLimbs）。
+   * 纸偶件（默认画法）。老的那一套（画躯干 + 程序化四肢）留作兜底与 A/B 对比，
+   * 见 renderer 的 drawDollLimbs 与 parts.ts 的 dollModeOn（?doll=0 回到旧管线）。
    */
   doll?: DollParts;
 };
@@ -60,20 +61,20 @@ export const DOLL_BACK_NAMES: PartName[] = ['armBU', 'armBL', 'handB'];
 export const DOLL_DECO_NAMES: PartName[] = ['tail', 'wing'];
 
 /**
- * 纸偶模式开关：`?doll=1`，或用 setDollMode 显式打开（测试与探针用）。
+ * 纸偶模式开关：`?doll=0` 关掉（回到旧管线），或用 setDollMode 显式指定（测试与探针用）。
  *
- * 为什么做成开关而不是直接换掉：
- *  · 两套必须能同屏比一次（同一帧、同一姿势，只有画法不同），否则"新管线更好"
- *    只能靠记忆里的印象来判断；
- *  · 平时不探纸偶件——十二个人里没换的人不探这 8 个文件，就是 60 多个必然 404
- *    （选人页把十二个人全预载一遍，那在手机上是真的往返延迟）。
+ * **默认是开的**——纸偶版（整人一张画、在关节处切开动）已经是默认画法，
+ * 部件也进了 precache（见 vite.config.ts）。
+ *
+ * 为什么还留一个关的开关：两套并存才便于对照（旧管线是「头与躯干是画的、四肢是程序化圆柱」
+ * 那一条；纸偶版是整人一张画再切开）。`?doll=0` 可以在同一个页面上看旧版长什么样。
  */
 let dollOverride: boolean | null = null;
 export function setDollMode(v: boolean | null): void { dollOverride = v; }
 export function dollModeOn(): boolean {
   if (dollOverride !== null) return dollOverride;
   if (typeof location === 'undefined') return false;
-  return /[?&]doll=1/.test(location.search);
+  return !/[?&]doll=0/.test(location.search);
 }
 
 /** **实际去探测的部件**。类型 PartName 仍列着七件（挂载逻辑逐件独立，随时能接上），
@@ -84,9 +85,10 @@ export function dollModeOn(): boolean {
  * 哪天真出了四肢素材，把名字加回这张表即可——扩展点还在，只是不再为它每次白付 60 个请求。
  *
  * 2026-10-23：**纸偶件**（整人一张画切出来的上臂/前臂/手/大腿/小腿/脚）另有一套探测表
- * （DOLL_NAMES），走 chars/<id>/parts/<部件名>.png，**只在 ?doll=1 时探**。
- * 为什么不并进这张表：这六件只有换成了纸偶的角色才有，逐个角色去探就是必然 404——
- * 十二个人里换了几个人就白付几倍 8 个请求。分开探，A/B 时打开开关即可。
+ * （DOLL_NAMES），走 chars/<id>/parts/<部件名>.png。
+ * 为什么不并进这张表：这几件只有纸偶版的角色才有，逐个角色去探就是必然 404。
+ * 2026-10-25：纸偶版成了默认画法，这几件照常探、也照常进 precache；
+ * ?doll=0 才回到旧管线。
  * 远侧（背向镜头的那条）复用近侧的图，不再单独切一套。 */
 const NAMES: PartName[] = [
   'head', 'torso',
@@ -176,8 +178,9 @@ export async function loadParts(
     const img = imgs[i];
     if (img) { const { top, bottom, left, right } = verticalBounds(img); out[n] = { img, top, bottom, left, right }; }
   });
-  // 纸偶件：整人一张画切出来的那一套。只在 ?doll=1 时探测——
-  // 平时不付这 8 个请求（旧管线用不上它们）。
+  // 纸偶件：整人一张画切出来的那一套（默认画法）。
+  // 远臂那三件与身后的附属件按角色有没有（rig.backArm / rig.deco）才探——
+  // 其余角色探了就是必然 404。
   if (dollModeOn()) {
     const names = [...DOLL_NAMES];
     if (opts?.backArm) names.push(...DOLL_BACK_NAMES);

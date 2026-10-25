@@ -47,16 +47,15 @@ export default defineConfig({
         // 但没有它远景层就整层退回程序化剪影（缺件回退是设计好的，见 src/render/stageArt.ts），
         // 所以它必须进 precache，否则离线时每一关的远景都变回剪影。
         globPatterns: ['**/*.{js,css,html,ico,woff2,ogg,png,json,webp}'],
-        // 上面那张清单是**按后缀**扫的，于是会把三样运行时根本不读的东西也塞进离线包：
+        // 上面那张清单是**按后缀**扫的，于是会把两样运行时根本不读的东西也塞进离线包：
         //   · edgeone.json —— 给 CDN 看的控制面文件，还必须**不能**被 SW 缓存
         //   · og.png（286KB）—— 只有抓取方会隔着网络取一次，玩家永远不会请求它
         //   · fonts/subset-chars.json —— 子集脚本与 font-coverage 测试的产物，构建期用
         // 合计约 297KB，占的是手机游戏的离线预算。按后缀扫看不出这三样的区别，只能点名排除。
         //
-        // chars/<id>/parts/ 是**纸偶件**（整人一张画切出来的那一套），只在 ?doll=1 时才请求
-        // （见 src/render/parts.ts 的 dollModeOn）。十一个人全套约 1.5MB，正常的对局
-        // 一个字节都用不到—— precache 进去就是让每个玩家白下载 1.5MB。
-        globIgnores: ['edgeone.json', 'og.png', 'fonts/subset-chars.json', '**/chars/*/parts/**'],
+        // 纸偶件（chars/<id>/parts/）**在里面**：纸偶版已是默认画法，选人页一次预载十二个人，
+        // 不进 precache 就是上百个请求外加「先火柴人、后变美术」的一闪。
+        globIgnores: ['edgeone.json', 'og.png', 'fonts/subset-chars.json'],
       },
       manifest: {
         name: '神仙打架', short_name: '神仙打架',

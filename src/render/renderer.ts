@@ -2006,7 +2006,8 @@ export function drawLimbs(
   build?: CharacterDef['build'],
 ): void {
   // 纸偶角色（整人一张画切出来的那一套）走自己的路：它有自己的骨架尺寸，
-  // 与共用骨架的那条并存。用 ?doll=1 打开（见 parts.ts 的 dollModeOn）。
+  // 与共用骨架的那条并存。纸偶版是默认画法，老的那条留作兜底
+  // （件没到位时）——见 parts.ts 的 dollModeOn（?doll=0 强制走旧管线）。
   const rig = build?.rig;
   const doll = parts?.doll;
   if (rig && doll && doll.torso && doll.head && doll.armFU && doll.armFL
