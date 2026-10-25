@@ -69,7 +69,7 @@ export const HONGHAIER: CharacterDef = {
   // 头身比：内容框 89×124、脸 44×51（源像素，量的——工具见 scripts/measure-heads.py）。
   // 归一只用一条锚（内容盒高 = 头高），脸只管挂点与接缝；1.18 是特质倍率：
   // 小孩的头本来就该比大人显眼（哪吒 1.12、红孩儿 1.18，八戒反着来 0.92）。
-  build: { rig: { k: 0.3008, chinY: 103.2, shoulderY: 98.56, hipY: 21.56, shoulderDx: -16.53, backShoulderDx: 12.54, backArm: true, headDx: -6.736, legFDx: 8.775, legBDx: -9.272, footAnchorX: 0.41, face: [83, 85, 64, 84], upperArm: 30.8, lowerArm: 13.86, handLen: 12.32, thigh: 5.216, shin: 5.216, torsoLen: 81.62, armOv: 2.322, legOv: 3.193 },   shoulderDx: -9.7, shoulderDy: 5.3, arm: 0.85, leg: 0.85, hand: 'fist', sleeve: 'none', face: [56, 55, 44, 51], head: 1.18 },
+  build: { rig: { k: 0.3008, chinY: 103.2, shoulderY: 98.56, hipY: 21.56, shoulderDx: -11.72, backShoulderDx: 12.54, backArm: true, headDx: -6.736, legFDx: 8.775, legBDx: -9.272, footAnchorX: 0.3977, face: [83, 85, 65, 84], upperArm: 30.8, lowerArm: 13.86, handLen: 12.32, thigh: 5.065, shin: 5.065, torsoLen: 81.62, armOv: 2.322, legOv: 3.193 },    shoulderDx: -9.7, shoulderDy: 5.3, arm: 0.85, leg: 0.85, hand: 'fist', sleeve: 'none', face: [56, 55, 44, 51], head: 1.18 },
   // 火尖枪。与哪吒同名同形，但短一截（78 对 96）、握点更靠后：他是个孩子，抡不动长的
   weapon: { kind: 'spear', len: 78, grip: 0.34, shaft: '#7a3a22', edge: '#ff9a2b' },
   adorn: {

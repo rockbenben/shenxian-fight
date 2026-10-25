@@ -64,7 +64,7 @@ export const BAIGU: CharacterDef = {
   // 头身比：内容框 91×124、脸 36×58（源像素，量的——工具见 scripts/measure-heads.py）。
   // 归一只有一条锚：**内容盒高就是头高**（素材契约保证头填满画幅），脸不再当尺子，
   // 只管横向挂点（脸心对齐身体中轴）与下巴到画幅底边的距离（脖子接缝）。
-  build: { rig: { k: 0.313, chinY: 120.1, shoulderY: 112.4, hipY: 12.83, shoulderDx: -22.22, backShoulderDx: 15.98, headDx: -2.246, legFDx: 12.25, legBDx: -12.95, footAnchorX: 0.1155, face: [31, 49, 42, 44], upperArm: 27.72, lowerArm: 18.48, handLen: 9.24, thigh: 3.287, shin: 3.287, torsoLen: 107.3, armOv: 2.465, legOv: 3.944 },    shoulderDx: -13.0, shoulderDy: 6.1, arm: 0.7, leg: 0.7, hand: 'bone', sleeve: 'none', face: [68, 39, 36, 58], head: 1.0 },
+  build: { rig: { k: 0.3008, chinY: 120.1, shoulderY: 115.5, hipY: 23.46, shoulderDx: -11.63, backShoulderDx: 12.87, headDx: -1.79, legFDx: 3.751, legBDx: -6.175, footAnchorX: 0.49, face: [55, 62, 30, 51], upperArm: 32.34, lowerArm: 15.4, handLen: 9.24, thigh: 8.65, shin: 8.65, torsoLen: 96.66, armOv: 1.216, legOv: 1.326 },          shoulderDx: -13.0, shoulderDy: 6.1, arm: 0.7, leg: 0.7, hand: 'bone', sleeve: 'none', face: [68, 39, 36, 58], head: 1.0 },
   // 骨爪不是杆兵器：len 最短、握点几乎在根部，画面上只探出一截白骨
   weapon: { kind: 'sword', len: 54, grip: 0.12, shaft: '#c9c3b2', edge: '#e8e4d6' }, // 短骨剑
   adorn: {
