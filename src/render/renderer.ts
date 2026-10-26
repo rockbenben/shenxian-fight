@@ -821,7 +821,7 @@ function poseFor(f: Fighter): Pose {
  * 只取 part.top..part.bottom 这段内容行（parts.ts 已裁掉上下透明留白），横向仍是整张图——
  * 素材自带的留白多少不再影响这一段贴图实际画出来有多高，接缝就不再随素材抖动。
  */
-export function drawBoneImg(ctx: CanvasRenderingContext2D, x: number, y: number, ex: number, ey: number, w: number, part: PartImage, white: boolean, facing: number, topExtend = 0, extra = 0) {
+export function drawBoneImg(ctx: CanvasRenderingContext2D, x: number, y: number, ex: number, ey: number, w: number, part: PartImage, white: boolean, facing: number, topExtend = 0, extra = 0, anchorOff = 0) {
   const dx = ex - x, dy = ey - y;
   const len = Math.hypot(dx, dy) || 1;
   ctx.save();
@@ -841,9 +841,15 @@ export function drawBoneImg(ctx: CanvasRenderingContext2D, x: number, y: number,
   // 弯起关节时两块之间会裂开一道楔形的空；多画的这一截正好补住它，
   // 而后画的那一段会盖住重叠、只把空的那块露出来。
   // 画出来的高度 = 贴图自然高度，所以贴图不会被抻（1:1 仍成立）。
+  //
+  // anchorOff：**按挂点摆**，不按内容的中线摆。躯干那一块的裁切框要够宽
+  // （身体与远臂之间那一段、裙摆的右边都得装得下），一加宽内容的中线就跟着偏，
+  // 整块躯干就歪了。挂点 = 身体中轴在件里的位置（离件左缘多远），
+  // 裁件框怎么加宽都摆得准。0 = 旧行为（按内容中线）。
+  const dx0 = anchorOff ? -anchorOff : -w;
   const dy0 = -topExtend, dh = len + topExtend + extra;
-  if (white) drawWhitePart(ctx, part, left, top, sw, sh, -w, dy0, w * 2, dh);
-  else ctx.drawImage(part.img, left, top, sw, sh, -w, dy0, w * 2, dh);
+  if (white) drawWhitePart(ctx, part, left, top, sw, sh, dx0, dy0, w * 2, dh);
+  else ctx.drawImage(part.img, left, top, sw, sh, dx0, dy0, w * 2, dh);
   ctx.restore();
 }
 
@@ -1884,7 +1890,17 @@ function drawDollLimbs(
   // ---- 躯干：从下巴画到腿根 ----------------------------------------------
   // 这一段用的是**这个人的**长度（下巴→腿根），所以贴图 1:1 落位：画里的肩膀
   // 就落在骨架的肩点上，不会被抻开。
-  drawBoneImg(ctx, a.chinX, a.chinY, a.hipX, a.hipY, segHalfW(doll.torso!), doll.torso!, white, fc);
+  //
+  // 横向按**挂点**摆（rig.torsoAnchorX = 身体中轴在件里的位置），不按内容的中线摆：
+  // 躯干的裁切框要够宽（身体与远臂之间那一段、裙摆的右边都得装得下），一加宽
+  // 内容的中线就跟着偏，整块躯干就歪了。按挂点摆，裁件框怎么加宽都摆得准。
+  const torsoAnchor = rig.torsoAnchorX ?? 0;
+  const torsoW = segHalfW(doll.torso!) * 2;
+  // 换边时整块内容是**镜像**的（drawBoneImg 里的 ctx.scale(facing,1)），
+  // 挂点离镜像后左缘的距离 = 整宽 − 原来的距离。
+  const anchorOff = fc >= 0 ? torsoAnchor : torsoW - torsoAnchor;
+  drawBoneImg(ctx, a.chinX, a.chinY, a.hipX, a.hipY, segHalfW(doll.torso!), doll.torso!, white, fc,
+    0, 0, anchorOff);
 
   // ---- 头：底边对齐下巴，横向**保持它在画里的位置** ------------------------
   // 横向不按脸心再对齐一次（那是旧版单独头像的规则）：纸偶的头是从整人一张画上

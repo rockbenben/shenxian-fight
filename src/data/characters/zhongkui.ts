@@ -57,7 +57,7 @@ export const ZHONGKUI: CharacterDef = {
   // 头身比：内容框 110×124、脸 45×53（源像素，量的——工具见 scripts/measure-heads.py）——
   // 幞头两侧的翅把框撑宽（脸只占框宽的四成）。
   // 归一只用一条锚（内容盒高 = 头高），脸只管横向挂点与下巴接缝。
-  build: { rig: { k: 0.3008, chinY: 121.7, shoulderY: 117, hipY: 49.28, shoulderDx: -24.91, backShoulderDx: 17.64, weapon: { gripY: 0.2431 }, headDx: -4.519, legFDx: 2.119, legBDx: -16.83, footAnchorX: 0.4276, face: [75, 45, 41, 51], upperArm: 32.34, lowerArm: 18.48, handLen: 13.86, thigh: 18.48, shin: 18.48, torsoLen: 72.38, armOv: 3.203, legOv: 4.485 },     shoulderDx: -17.1, shoulderDy: 4.2, arm: 1.25, leg: 1.2, hand: 'fist', sleeve: 'cuff', face: [60, 39, 45, 53], head: 1.0 },
+  build: { rig: { k: 0.3008, chinY: 121.7, shoulderY: 117, hipY: 49.28, shoulderDx: -24.91, backShoulderDx: 17.64, weapon: { gripY: 0.2431 }, torsoAnchorX: 19.54, headDx: -4.519, legFDx: 2.119, legBDx: -16.83, footAnchorX: 0.4276, face: [75, 45, 41, 51], upperArm: 32.34, lowerArm: 18.48, handLen: 13.86, thigh: 18.48, shin: 18.48, torsoLen: 72.38, armOv: 3.203, legOv: 4.485 },         shoulderDx: -17.1, shoulderDy: 4.2, arm: 1.25, leg: 1.2, hand: 'fist', sleeve: 'cuff', face: [60, 39, 45, 53], head: 1.0 },
   weapon: { kind: 'sword', len: 92, grip: 0.3, shaft: '#4a2b4c', edge: '#c8443c' }, // 判官剑
   adorn: {
     // 官袍的宽袖与绦带：最宽、最沉，摆动幅度小——他不是靠身法的人

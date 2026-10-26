@@ -74,7 +74,7 @@ export const HOUYI: CharacterDef = {
   // 于是十二个人看着像同一副假人换了个色。
   // 头身比：内容框 83×124、脸 45×43（源像素，量的——工具见 scripts/measure-heads.py）。
   // 归一只用一条锚（内容盒高 = 头高），脸只管横向挂点与下巴接缝。
-  build: { rig: { k: 0.313, chinY: 117, shoulderY: 110.9, hipY: 52.36, shoulderDx: -26.1, backShoulderDx: 16.67, weapon: { gripY: 0.8873, tips: [[0, 0.04412], [1, 0.04412]] }, headDx: -8.459, legFDx: 3.294, legBDx: -14.86, footAnchorX: 0, face: [50, 40, 38, 33], upperArm: 29.26, lowerArm: 16.94, handLen: 12.32, thigh: 16.16, shin: 16.16, torsoLen: 64.68, armOv: 4.437, legOv: 3.944 },      shoulderDx: -17.2, shoulderDy: 5.1, arm: 1.0, leg: 1.0, hand: 'fist', sleeve: 'bracer', face: [58, 39, 45, 43], head: 1.0 },
+  build: { rig: { k: 0.313, chinY: 117, shoulderY: 110.9, hipY: 52.36, shoulderDx: -26.1, backShoulderDx: 16.67, weapon: { gripY: 0.8873, tips: [[0, 0.04412], [1, 0.04412]] }, torsoAnchorX: 18.24, headDx: -8.459, legFDx: 3.294, legBDx: -14.86, footAnchorX: 0, face: [50, 40, 38, 33], upperArm: 29.26, lowerArm: 16.94, handLen: 12.32, thigh: 16.16, shin: 16.16, torsoLen: 64.68, armOv: 4.437, legOv: 3.944 },          shoulderDx: -17.2, shoulderDy: 5.1, arm: 1.0, leg: 1.0, hand: 'fist', sleeve: 'bracer', face: [58, 39, 45, 43], head: 1.0 },
   // 弓：借 staff 的画法（一根长杆），但握点在正中、颜色是深褐弓身
   weapon: { kind: 'bow', len: 104, grip: 0.5, shaft: '#6b4a2f', edge: '#ffb340' }, // 震天弓
   adorn: {

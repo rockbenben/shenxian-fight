@@ -121,6 +121,56 @@ def main():
         if leg_h < 6 or shin_h < 6:
             notes.append(f'腿很碎（大腿 {leg_h:.1f} / 小腿 {shin_h:.1f} 逻辑单位）—— 画里袍子到脚面就是这样')
 
+        # ---- 5. 躯干的切线有没有**切掉身体** --------------------------------
+        # 为什么要逐行量：躯干此前是矩形切的，右缘是一条竖直线；而画上身体与远臂
+        # 之间那条界是**随高度变的曲线**。切线落进身体，摆臂时体侧就多出一道直边。
+        #
+        # 量法不是「切线右边有多少像素」——那些像素多半属于**远臂件**（另有一块盖着，
+        # 不算丢）。真正要量的是：**切线右侧那些像素，有没有别的件盖住**。
+        # 没人盖 = 身体被切掉了一块（铁扇的裙摆就是这么没的：切在 72%，而裙摆到 87%，
+        # 远臂那一块只到 85%，剩下的没人管）。
+        #
+        # 切件脚本按**同一条**规则算右缘（cf.torso_right_edges）：量与画走同一条路，
+        # 两处各算一遍必然漂。
+        bands = sp.get('armB')
+        if bands and len(bands) == 2 and all(isinstance(v, (int, float)) for v in bands):
+            bands = [bands, bands, bands]
+        right_edges = cf.torso_right_edges(sp, alpha, W, H, sp['chin'], sp['hip'])
+        hole_rows = 0
+        hole_px = 0
+        worst = 0
+        for i, rx in enumerate(right_edges):
+            y = int(round(Y(sp['chin']))) + i
+            if y >= int(Y(sp['hip'])) - 1:
+                break                       # 最后一行是袍摆/脚面交界，脚那一块接过去
+            ypct = sp['chin'] + (i + 0.5) / len(right_edges) * (sp['hip'] - sp['chin'])
+            band = None
+            segs = [(sp['shoulder'] - 3, sp['elbow']), (sp['elbow'], sp['wrist']), (sp['wrist'], sp['handEnd'])]
+            for k, (a, b) in enumerate(segs):
+                if a <= ypct <= b and bands:
+                    band = bands[k] if k < len(bands) else bands[-1]
+                    break
+            cx = int(round(X(rx)))
+            hole = 0
+            for x in range(cx, W):
+                if alpha[y, x] <= 8:
+                    continue
+                if band and X(band[0]) <= x <= X(band[1]):
+                    continue          # 远臂件盖着，不算丢
+                hole += 1
+            if hole:
+                hole_rows += 1
+                hole_px += hole
+                worst = max(worst, hole)
+        if hole_px:
+            note = (f'躯干的切线切掉身体 {hole_rows} 行、最深一行 {worst} 像素'
+                    f'（{worst * 154.0 / H:.1f} 逻辑单位）')
+            # 深过 2 个逻辑单位才算毛病：再浅就是描边的一两个像素，肉眼看不见。
+            if worst * 154.0 / H > 2.0:
+                problems.append(note)
+            else:
+                notes.append(note)
+
         flag = 'OK ' if not problems else 'NG '
         bad_total += len(problems)
         line = f'{flag}{cid:<11}' + ('；'.join(problems) if problems else '')

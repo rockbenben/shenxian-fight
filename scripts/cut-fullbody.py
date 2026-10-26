@@ -361,15 +361,68 @@ def polyline_at(pl, y_pct):
     return pl[-1][1]
 
 
-def clip_torso_edges(piece, spec, crop_x0_px, W):
+def torso_right_edges(spec, alpha, W, H, y0, y1):
+    """逐行给出躯干的右缘（像素列号）。
+
+    为什么不能是一条竖直线：远臂那一侧，画上身体与远臂之间那条界是**随高度变的
+    曲线**；矩形切出来的是竖直线，摆臂时体侧就多出一道直边。更要紧的是——
+    切线右侧若有一块身体**没有任何件盖住**，那块身体就没了（铁扇的裙摆就是这么
+    没的：切在 72%，而裙摆到 87%，远臂那一块只到 85%）。
+
+    三种取法：
+    - 规格表里写了 torsoR：就用它（那条界是**人读画定**的，最准）；
+    - 有远臂件（armB）但没写 torsoR：远臂那几行取**远臂件这一行真正有像素的左缘**
+      （不是切片的裁切框左缘——裁切框里左边可能是一段空白，按框左缘裁，
+      躯干与远臂之间就会露出一条缝）；其余行取**剪影的右缘**；
+    - 没有远臂件：整段取剪影的右缘（那一行身体到哪儿就到哪儿）。
+    """
+    # 行数必须与**裁件框的行数**一致：裁件框是两次取整之差
+    # （int(round(H*y1/100)) - int(round(H*y0/100))），按 (y1-y0)/100*H 取整会差一行，
+    # 差的那一行一路错下去——裁出来的边缘会从躯干中间切出一条空当。
+    n = max(1, int(round(H * y1 / 100)) - int(round(H * y0 / 100)))
+    edges = []
+    pl = spec.get('torsoR')
+    bands = spec.get('armB')
+    if bands and len(bands) == 2 and all(isinstance(v, (int, float)) for v in bands):
+        bands = [bands, bands, bands]
+    segs = [(spec['shoulder'] - 3, spec['elbow']), (spec['elbow'], spec['wrist']),
+            (spec['wrist'], spec['handEnd'])]
+    for i in range(n):
+        ypct = y0 + (i + 0.5) / n * (y1 - y0)
+        # 行号要与**裁件框的行**对齐（裁件框的第一行就是 int(round(H*y0/100))），
+        # 差一行的话，裁出来的边缘与算出来的边缘就对不上（体检会报出假洞）。
+        y = min(H - 1, int(round(H * y0 / 100)) + i)
+        row = alpha[y]
+        # 剪影的右缘
+        sil = W - 1
+        while sil >= 0 and row[sil] <= 8:
+            sil -= 1
+        if pl:
+            edges.append(polyline_at(pl, ypct))
+            continue
+        band = None
+        if bands:
+            for k, (a, b) in enumerate(segs):
+                if a <= ypct <= b:
+                    band = bands[k] if k < len(bands) else bands[-1]
+                    break
+        if band:
+            # 这一行里、带子范围内最靠左的**有像素**处 = 远臂件这一行的内容左缘
+            x = int(W * band[0] / 100)
+            while x < W and row[x] <= 8:
+                x += 1
+            edges.append(x / W * 100 if x < W else 100.0)
+        else:
+            edges.append((sil + 1) / W * 100 if sil >= 0 else 100.0)
+    return edges
+
+
+def clip_torso_edges(piece, spec, crop_x0_px, W, right_edges=None):
     """把躯干那一块的左右缘按**画上的界**逐行裁掉（不是矩形的一条竖边）。
 
-    为什么：手臂那一侧，画上身体与手臂之间那条界是**随高度变的曲线**；
-    矩形切只能给一条竖直线，于是摆臂时那道竖边就露在体侧（画面上多出一条直边）。
-    规格表里写 torsoL / torsoR（[[y%, x%], ...]）就是那条界。
-
     坐标相对**整幅**的百分比，裁件时要把裁切框的左缘换算掉。"""
-    if 'torsoL' not in spec and 'torsoR' not in spec and 'armR' not in spec:
+    if 'torsoL' not in spec and 'torsoR' not in spec and 'armR' not in spec \
+            and right_edges is None:
         return piece
     a = np.array(piece.getchannel('A'))
     h, w = a.shape
@@ -380,6 +433,8 @@ def clip_torso_edges(piece, spec, crop_x0_px, W):
         ypct = y0 + (i + 0.5) / h * (y1 - y0)
         lx = polyline_at(left_pl, ypct)
         rx = polyline_at(spec.get('torsoR'), ypct)
+        if rx is None and right_edges is not None and i < len(right_edges):
+            rx = right_edges[i]
         if lx is not None:
             c = int(round(W * lx / 100 - crop_x0_px))
             a[:, :max(0, min(w, c))] = 0
@@ -664,11 +719,16 @@ def cut_one(cid, spec, verbose=True):
         arr[max(0, ky):, :max(0, kx0)] = 0
         arr[max(0, ky):, min(arr.shape[1], kx1):] = 0
         pieces['head'].putalpha(Image.fromarray(arr))
-    pieces['torso'] = crop_pct(im, spec['torso'][0], spec['chin'], spec['torso'][1], spec['hip'])
-    # 躯干的左右缘按画上的界逐行裁（规格表里的 torsoL / torsoR）——
+    # 躯干的右缘**先算出来**：切件框得够宽，右缘那一列才裁得到。
+    # （原来的矩形切：切线右侧若有一块身体没人盖，那块身体就没了。）
+    right_edges = torso_right_edges(spec, alpha, W, H, spec['chin'], spec['hip'])
+    axis_px = W * (spec['torso'][0] + spec['torso'][1]) / 2 / 100
+    torso_x1 = max(spec['torso'][1], max((e or 0) for e in right_edges) + 0.5)
+    pieces['torso'] = crop_pct(im, spec['torso'][0], spec['chin'], torso_x1, spec['hip'])
+    # 躯干的左右缘按画上的界逐行裁（规格表里的 torsoL / torsoR，或按行算出来的右缘）——
     # 矩形切出来的是一条竖边，手臂那一侧画上的界却是条随高度变的曲线。
     pieces['torso'] = clip_torso_edges(
-        pieces['torso'], spec, W * spec['torso'][0] / 100, W)
+        pieces['torso'], spec, W * spec['torso'][0] / 100, W, right_edges)
     # 腿同样留关节重叠：膝盖弯起来时两块之间也会裂开一道缝（姿势里膝弯 40°）。
     # 脚那一块不往上留——脚的贴图是**以踝为锚**画的（见 renderer 的 drawDollFoot），
     # 往上留会让整只脚沉到地里去；踝那里本来几乎不弯（差 8°），缝本来就看不见。
@@ -697,6 +757,15 @@ def cut_one(cid, spec, verbose=True):
         pw = tb[2] - tb[0]
         ph = tb[3] - tb[1]
         rig[name] = {'w': pw * k, 'h': ph * k}
+
+    # 躯干的**挂点**：身体中轴在件里的位置（离件左缘多远，逻辑单位）。
+    #
+    # 为什么不能按内容的中线挂：躯干那一块是按中轴对齐画的，可它的裁切框要够宽
+    # （身体与远臂之间那一段、裙摆的右边都得装得下），一加宽，内容的中线就跟着偏，
+    # 整块躯干就歪了。记下中轴在件里的位置，渲染时按它挂——裁件框怎么加宽都不偏。
+    tb = trim_box(pieces['torso'])
+    content_left_px = W * spec['torso'][0] / 100 + tb[0]
+    rig['torsoAnchorX'] = (axis_px - content_left_px) * k
 
     # ---- 兵器件：画出来的那一张（不是程序化的几何）--------------------------
     # 它不占 rig[name]（那一张是身体各块的尺寸），握点与弓弭另记。
