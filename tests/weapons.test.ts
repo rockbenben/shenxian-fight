@@ -130,7 +130,7 @@ function recorder() {
 function strokeOf(kind: WeaponDef['kind']): string {
   const { ctx, log } = recorder();
   // 几何完全一样，只有形制不同——差异只可能来自画法本身
-  drawWeapon(ctx, [100, 100], [140, 100], { kind, len: 90, grip: 0.3, shaft: '#112233', edge: '#445566' }, false);
+  drawWeapon(ctx, [100, 100], [140, 100], 1, { kind, len: 90, grip: 0.3, shaft: '#112233', edge: '#445566' }, false);
   return log.join('|');
 }
 

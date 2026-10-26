@@ -1222,17 +1222,25 @@ function ballGrad(ctx: CanvasRenderingContext2D, cx: number, cy: number, r: numb
  * 而十二个人此前全是同一颗圆，读起来就像同一副假人换了身衣服。
  */
 function drawHand(
-  ctx: CanvasRenderingContext2D, at: [number, number], fill: string, white: boolean,
+  ctx: CanvasRenderingContext2D, at: [number, number], fc: number, fill: string, white: boolean,
   kind: 'fist' | 'claw' | 'paw' | 'bone' = 'fist',
 ) {
+  // 手画在**世界坐标**里，形状却带方向（指缝朝前、指头朝前）。朝向翻了它必须跟着翻，
+  // 否则换边后手指朝反方向——握拳的指缝跑到手背那侧，爪子的三根指朝另一边张开。
+  // 办法：把手的局部坐标**整体镜像**（scale(fc,1)），手就在自己该在的那一侧了。
+  // 角度不用改：镜像会把角度一起翻过来（局部 (sin a, cos a) → 屏幕 (fc·sin a, cos a)）。
+  ctx.save();
+  ctx.translate(at[0], at[1]);
+  ctx.scale(fc, 1);
   if (kind === 'claw') {
     // 爪：三根锥形指从腕上张开，猴王的手
     ctx.fillStyle = white ? '#fff' : fill;
-    ctx.beginPath(); ctx.arc(at[0], at[1], 4.4, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(0, 0, 4.4, 0, Math.PI * 2); ctx.fill();
     for (const a of [-0.66, 0, 0.66]) {
-      const ex = at[0] + Math.sin(a) * 9, ey = at[1] + Math.cos(a) * 9;
-      fillTapered(ctx, at[0], at[1], ex, ey, 1.7, 0.5, white, true, fill);
+      const ex = Math.sin(a) * 9, ey = Math.cos(a) * 9;
+      fillTapered(ctx, 0, 0, ex, ey, 1.7, 0.5, white, true, fill);
     }
+    ctx.restore();
     return;
   }
   if (kind === 'bone') {
@@ -1241,30 +1249,32 @@ function drawHand(
     ctx.lineWidth = 1.7; ctx.lineCap = 'round';
     for (const a of [-0.52, 0.04, 0.56]) {
       ctx.beginPath();
-      ctx.moveTo(at[0], at[1]);
-      ctx.lineTo(at[0] + Math.sin(a) * 8.5, at[1] + Math.cos(a) * 8.5);
+      ctx.moveTo(0, 0);
+      ctx.lineTo(Math.sin(a) * 8.5, Math.cos(a) * 8.5);
       ctx.stroke();
     }
+    ctx.restore();
     return;
   }
   if (kind === 'paw') {
     // 掌：宽厚的一只厚爪，猪八戒
     ctx.fillStyle = white ? '#fff' : fill;
-    ctx.beginPath(); ctx.ellipse(at[0], at[1], 7.6, 6.4, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(0, 0, 7.6, 6.4, 0, 0, Math.PI * 2); ctx.fill();
     if (!white) { ctx.strokeStyle = contourOf(fill); ctx.lineWidth = LIMB_STROKE; ctx.stroke(); }
     ctx.fillStyle = white ? '#fff' : shade(fill, -24);
     for (const a of [-0.52, 0, 0.52]) {
       ctx.beginPath();
-      ctx.arc(at[0] + Math.sin(a) * 5.4, at[1] + Math.cos(a) * 4.8, 2, 0, Math.PI * 2);
+      ctx.arc(Math.sin(a) * 5.4, Math.cos(a) * 4.8, 2, 0, Math.PI * 2);
       ctx.fill();
     }
+    ctx.restore();
     return;
   }
   // 半径 6.6：5.2 那版**在实机上认不出是手**——前臂末端本来就有 5px 的笔锋，
   // 两者一样粗时读成"笔锋收了个圆头"，而不是"这里有只手"。手要比它握的那截明显粗一圈。
   ctx.fillStyle = white ? '#fff' : fill;
   ctx.beginPath();
-  ctx.arc(at[0], at[1], 6.6, 0, Math.PI * 2);
+  ctx.arc(0, 0, 6.6, 0, Math.PI * 2);
   ctx.fill();
   if (!white) {
     ctx.strokeStyle = contourOf(fill); ctx.lineWidth = LIMB_STROKE; ctx.stroke();
@@ -1275,10 +1285,11 @@ function drawHand(
     ctx.lineWidth = 1.3;
     for (const r of [4.5, 2.0]) {
       ctx.beginPath();
-      ctx.arc(at[0], at[1], r, -0.72, 0.72);
+      ctx.arc(0, 0, r, -0.72, 0.72);
       ctx.stroke();
     }
   }
+  ctx.restore();
 }
 
 /**
@@ -1648,20 +1659,34 @@ const TWO_HANDED = new Set(['staff', 'rake', 'glaive', 'mace', 'spear', 'axe']);
  * 约定与腿那条一致：骨段方向 = (sin a, cos a)，a=0 垂直向下、a>0 朝角色正面。
  * 手臂的肘弯量是**加**的（腿是减）：armB = [大腿…] 前臂绝对角 = 上臂角 + 肘弯量。
  * 肘挑哪个解：**肘在下**（自然肘位）——两个解里屏幕坐标 y 大的那个。
+ *
+ * **在角色空间里解**（把目标与肩的横向差乘 fc，翻到"角色朝右"那一侧）。
+ *
+ * 为什么不能按世界坐标解：姿势里的 armB 是**角色空间**的角度——姿势不随朝向变，
+ * 镜像由 segEnd 里的 `* facing` 干。而 segEnd 画的正是这条骨段：
+ * 屏幕方向 = (sin a · fc, cos a)。于是这里若按世界坐标解出角度，换边时会被
+ * segEnd **再镜像一次**：镜像两次等于没镜像，后臂便朝反方向伸出去。
+ * 2026-10-27 实测：朝左时后手跑到身前 60 多个逻辑单位（后羿拉弓那只手最明显，
+ * 六个双手兵器——棍/耙/枪/锤/叉/斧——的后手同样反了）。
+ *
+ * 在角色空间里解还顺手解决"两个解肘同高时挑哪一个"：换边后两个解会互换，
+ * 按世界坐标挑会在平局时两边挑到不同的一支；在角色空间里挑，两边挑的是同一个解，
+ * 镜像自然精确。
  */
-function armIK(sx: number, sy: number, tx: number, ty: number, upper: number, lower: number): [number, number] | null {
-  const dx = tx - sx, dy = ty - sy;
+function armIK(sx: number, sy: number, tx: number, ty: number, upper: number, lower: number, fc: number): [number, number] | null {
+  // 肩在角色空间里就是原点：横向差按 fc 翻，纵向不动
+  const dx = (tx - sx) * fc, dy = ty - sy;
   const d = Math.hypot(dx, dy);
   if (d > upper + lower - 0.5 || d < Math.abs(upper - lower) + 0.5) return null;
   const a = (upper * upper - lower * lower + d * d) / (2 * d);
   const h = Math.sqrt(Math.max(0, upper * upper - a * a));
-  const mx = sx + dx * a / d, my = sy + dy * a / d;
+  const mx = dx * a / d, my = dy * a / d;
   const px = -dy / d, py = dx / d;
   const e1: [number, number] = [mx + h * px, my + h * py];
   const e2: [number, number] = [mx - h * px, my - h * py];
   const elbow = e1[1] >= e2[1] ? e1 : e2;         // 肘在下
-  const upAng = Math.atan2(elbow[0] - sx, elbow[1] - sy);
-  const foAng = Math.atan2(tx - elbow[0], ty - elbow[1]);
+  const upAng = Math.atan2(elbow[0], elbow[1]);
+  const foAng = Math.atan2(dx - elbow[0], dy - elbow[1]);
   return [upAng, foAng - upAng];
 }
 
@@ -1690,7 +1715,7 @@ function backGrip(
   ));
   const tx = fHand[0] - ux * t, ty = fHand[1] - uy * t;
   // 够不着就够不着：手放开兵器（后臂用姿势里原来的角度），绝不硬掰
-  return armIK(bshX, bshY, tx, ty, upperArm, lowerArm);
+  return armIK(bshX, bshY, tx, ty, upperArm, lowerArm, fc);
 }
 
 /**
@@ -1721,7 +1746,7 @@ export function backArmFor(
       const dx = fHand[0] - fElbow[0], dy = fHand[1] - fElbow[1];
       const L = Math.hypot(dx, dy) || 1;
       const ux = dx / L, uy = dy / L;
-      return armIK(a.bshX, a.bshY, fHand[0] - ux * BOW_PULL, fHand[1] - uy * BOW_PULL, upperArm, lowerArm);
+      return armIK(a.bshX, a.bshY, fHand[0] - ux * BOW_PULL, fHand[1] - uy * BOW_PULL, upperArm, lowerArm, fc);
     }
     const grip = backGrip(a.bshX, a.bshY, fElbow, fHand, w, fc, upperArm, lowerArm);
     // 纸偶角色的近肩在**身体的轮廓边**上（画里就是这么画的），前臂因此比旧管线更靠前，
@@ -1747,7 +1772,7 @@ export function backArmFor(
     const L = Math.hypot(dx, dy) || 1;
     const ux = dx / L, uy = dy / L;
     return armIK(bshX, bshY, fHand[0] - ux * BOW_PULL, fHand[1] - uy * BOW_PULL,
-      UPPER_ARM, LOWER_ARM);
+      UPPER_ARM, LOWER_ARM, fc);
   }
   return backGrip(bshX, bshY, fElbow, fHand, w, fc);
 }
@@ -1895,10 +1920,23 @@ function drawDollLimbs(
   // 躯干的裁切框要够宽（身体与远臂之间那一段、裙摆的右边都得装得下），一加宽
   // 内容的中线就跟着偏，整块躯干就歪了。按挂点摆，裁件框怎么加宽都摆得准。
   const torsoAnchor = rig.torsoAnchorX ?? 0;
-  const torsoW = segHalfW(doll.torso!) * 2;
-  // 换边时整块内容是**镜像**的（drawBoneImg 里的 ctx.scale(facing,1)），
-  // 挂点离镜像后左缘的距离 = 整宽 − 原来的距离。
-  const anchorOff = fc >= 0 ? torsoAnchor : torsoW - torsoAnchor;
+  // anchorOff 两个朝向**取同一个值**。
+  //
+  // 挂点（rig.torsoAnchorX）是"身体中轴离件左缘多远"，源图里中轴就在那个位置。
+  // drawBoneImg 的做法是：把内容摆在局部 x∈[-anchorOff, -anchorOff+整宽]，于是
+  // **中轴恰好落在局部 x=0**（= 挂载点）；朝向翻转是内容被 ctx.scale(facing,1)
+  // 整体镜像，而镜像轴正是局部 x=0 —— 也就是说，被镜像的**内容**连同它的中轴
+  // 一起翻到另一边，中轴仍然落在挂载点上。所以换边时 anchorOff 不该变。
+  //
+  // 原来这里给朝左的分支写成「整宽 − 原来的距离」，等于把中轴又搬了一次：
+  // 偏的量 = 整宽 − 2×挂点。实测十二个人：猪八戒 15.5、红孩儿 15.0、二郎 12.2、
+  // 后羿 9.3、钟馗 7.2 个逻辑单位（一个身高才 154）。
+  //
+  // 画面上读作「角色在右边时头和手臂明显右移」：头、近肩、后肩都是**按中轴**摆的
+  // （那几处乘 fc 是对的），只有躯干偏到了左边——衬着偏掉的躯干看，
+  // 头和手臂就像甩到了身体右边。猪八戒那张尤其明显：躯干整个是一块方板，
+  // 左边切得笔直，头浮在右上方，近臂与躯干之间裂开一道缝。
+  const anchorOff = torsoAnchor;
   drawBoneImg(ctx, a.chinX, a.chinY, a.hipX, a.hipY, segHalfW(doll.torso!), doll.torso!, white, fc,
     0, 0, anchorOff);
 
@@ -1959,7 +1997,7 @@ function drawDollLimbs(
         rig.weapon.tips, (weapon.kind === 'bow' && armBSolved) ? bHand : undefined,
       );
     } else {
-      drawWeapon(ctx, fElbow, fHand, weapon, white, weaponScale, weaponGlow,
+      drawWeapon(ctx, fElbow, fHand, fc, weapon, white, weaponScale, weaponGlow,
         weapon.kind === 'bow' ? bHand : undefined);
     }
   }
@@ -2095,7 +2133,7 @@ export function drawLimbs(
   const handB = seg(ctx, j[0], j[1], armB[0] + armB[1], LOWER_ARM, rF[0], rF[1], fc, backSkin, parts?.armFL ?? parts?.armB, white);
   // 握杆的后手要压在兵器与身体**之上**（手在杆上，不是杆在身上），所以晚一点画
   const deferBackHand = !parts?.armB && gripArm !== null;
-  if (!parts?.armB && !parts?.handF && !deferBackHand) drawHand(ctx, handB, backSkin, white, build?.hand);
+  if (!parts?.armB && !parts?.handF && !deferBackHand) drawHand(ctx, handB, fc, backSkin, white, build?.hand);
   j = seg(ctx, hipX, hipY, p.legB[0], THIGH, rT[0], rT[1], fc, backLimb, parts?.legFU ?? parts?.legB, white);
   const ankB = seg(ctx, j[0], j[1], p.legB[0] - p.legB[1], SHIN, rS[0], rS[1], fc, backLimb, parts?.legFL ?? parts?.legB, white);
   if (!parts?.legB && !parts?.footF) drawFoot(ctx, ankB, fc, backLimb, white);
@@ -2106,7 +2144,7 @@ export function drawLimbs(
   if (parts?.weapon) { // 有贴图就用贴图
     seg(ctx, fHand[0], fHand[1], p.armF[0] + p.armF[1], 34, 4, 4, fc, main, parts.weapon, white);
   } else if (weapon) { // 否则走程序化兵器：方向取前臂（肘→手）的实际朝向，不重算角度约定
-    drawWeapon(ctx, fElbow, fHand, weapon, white, weaponScale, weaponGlow,
+    drawWeapon(ctx, fElbow, fHand, fc, weapon, white, weaponScale, weaponGlow,
       weapon.kind === 'bow' && deferBackHand ? handB : undefined);
   }
 
@@ -2149,7 +2187,7 @@ export function drawLimbs(
   }
 
   // 握杆的后手：压在兵器与身体之上。手在杆上，杆在手上——顺序就是"握住"这件事本身。
-  if (deferBackHand) drawHand(ctx, handB, backSkin, white, build?.hand);
+  if (deferBackHand) drawHand(ctx, handB, fc, backSkin, white, build?.hand);
 
   const { cx: headCx, cy: headCy, angle: baseHeadAngle } = headAnchor(shX, shY, p.lean, fc);
   const headAngle = baseHeadAngle + p.headTilt * fc; // 头相对躯干的额外偏转
@@ -2283,7 +2321,7 @@ export function drawLimbs(
   // 顺序就是"握住"这件事本身
   // 手是皮肤的一部分，跟手臂同色（此前用 main，是 accent 时代的老办法：accent 近白，
   // 手若也用白就成了腰腹上最显眼的一枚浅色贴纸——现在手臂本身已是皮肤色，手跟着走就对上了）。
-  if (!parts?.armF && !parts?.handF) drawHand(ctx, j, skin, white, build?.hand);
+  if (!parts?.armF && !parts?.handF) drawHand(ctx, j, fc, skin, white, build?.hand);
 }
 
 /** 兵器握持点（前手末端）与朝向。抽出来是因为拖影也要用同一个点——
@@ -2332,6 +2370,7 @@ export function weaponTipOf(p: Pose, x: number, feetY: number, fc: number, w: We
  * 导出只为那条测试：它要拿一个记录用的 ctx 把九种各画一遍，比对调用序列。 */
 export function drawWeapon(
   ctx: CanvasRenderingContext2D, elbow: [number, number], hand: [number, number],
+  fc: number,
   w0: WeaponDef, white: boolean, scale = 1, glow = 0,
   /** 拉弦的那只手（弓用）：弦从两个弓弭汇到它上面，画成拉满的 V。别的形制不看这个参数。 */
   pull?: [number, number],
@@ -2341,13 +2380,17 @@ export function drawWeapon(
     ctx.save();
     ctx.globalCompositeOperation = 'lighter';
     ctx.globalAlpha = Math.min(glow, 1) * 0.55;
-    drawWeapon(ctx, elbow, hand, { ...w, shaft: w.edge }, false, 1, 0, pull);
+    drawWeapon(ctx, elbow, hand, fc, { ...w, shaft: w.edge }, false, 1, 0, pull);
     ctx.restore();
   }
   const dx = hand[0] - elbow[0], dy = hand[1] - elbow[1];
   const L = Math.hypot(dx, dy) || 1;
   const ux = dx / L, uy = dy / L;      // 顺着前臂往外
-  const px = -uy, py = ux;             // 垂直方向
+  // 垂直方向（兵器的"侧"）。**乘 fc**：兵器是画在**世界坐标**里的（没有 ctx.scale），
+  // 于是它自己不会跟着朝向镜像；朝向只体现在 u 上（u 来自镜像后的肘/手）。
+  // 侧向向量必须跟着一起翻，否则只有单侧特征的那几件（戚的斧刃）换边后会长反。
+  // ux·uy 的 90° 旋转在换边后要变成**反向**的那一支——镜像会把手性也翻过来。
+  const px = -uy * fc, py = ux * fc;
   const fwd = w.len * (1 - w.grip), back = w.len * w.grip;
   const tipX = hand[0] + ux * fwd, tipY = hand[1] + uy * fwd;
   const buttX = hand[0] - ux * back, buttY = hand[1] - uy * back;
