@@ -309,7 +309,7 @@ def cut_weapon(cid, outdir):
     gy = span_mid(col)
     if gy is None:
         return None
-    piece.save(os.path.join(outdir, 'weapon.png'))
+    piece.save(os.path.join(outdir, 'weapon.png'), optimize=True)
     geo = {'gripY': gy / max(1, h - 1)}
     if wdef['kind'] == 'bow':
         # 弓弭：左右各一列（弧的两端），弦就拉在它们之间
