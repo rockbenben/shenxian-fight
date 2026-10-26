@@ -1840,7 +1840,9 @@ function drawDollLimbs(
   const a = dollAnchors(x, feetY, p.lean, p.crouch, fc, rig);
 
   // ---- 后侧肢体：先画，被躯干盖住 ----------------------------------------
-  const armB = backArmFor(p, x, feetY, fc, weapon, build, rig) ?? p.armB;
+  // 后臂**解算**出来（去握杆/拉弦）时才算真在握；解不出来就用姿势里那对角度。
+  const armBSolved = backArmFor(p, x, feetY, fc, weapon, build, rig);
+  const armB = armBSolved ?? p.armB;
   // 后臂**只在画里露出来的时候才画**。
   //
   // 为什么：远臂被身体挡着的角色（多数是侧身站姿），画上根本没有第二条胳膊，
@@ -1936,7 +1938,9 @@ function drawDollLimbs(
         // 所以弓走「绝对朝向」那一支（absolute），其余兵器顺着前臂伸出去。
         weapon.kind === 'bow' ? -Math.PI / 2 : 0,
         weapon.kind === 'bow',
-        rig.weapon.tips, weapon.kind === 'bow' ? bHand : undefined,
+        // 弓弦只在**后臂真被解算到弦上**（弓被拉开了）时才汇到后手；
+        // 站着的时候后手垂在体侧，弦要是也拉过去，就成了一道横穿全身的 V 形橙线。
+        rig.weapon.tips, (weapon.kind === 'bow' && armBSolved) ? bHand : undefined,
       );
     } else {
       drawWeapon(ctx, fElbow, fHand, weapon, white, weaponScale, weaponGlow,
