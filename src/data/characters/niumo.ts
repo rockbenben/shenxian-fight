@@ -77,7 +77,7 @@ export const NIUMO: CharacterDef = {
   // 头身比：内容框 114×123、脸 48×39（源像素，量的——工具见 scripts/measure-heads.py；
   // 这张脸的肤色被胡子吃掉大半，量的地方是眉到下颌那一块）。牛角与胡子是头的一部分，
   // 跟着整颗头一起缩放——归一只用一条锚（内容盒高 = 头高），脸只管挂点与接缝。
-  build: { rig: { k: 0.3008, chinY: 114, shoulderY: 107.8, hipY: 29.26, shoulderDx: -32.69, backShoulderDx: 28.73, backArm: true, weapon: { gripY: 0.5 }, headDx: 0.6828, legFDx: 12.58, legBDx: -14.04, footAnchorX: 0.006071, face: [109, 81, 50, 41], upperArm: 27.72, lowerArm: 18.48, handLen: 26.18, thigh: 8.163, shin: 8.163, torsoLen: 84.7, armOv: 6.632, legOv: 5.306 },      shoulderDx: -15.7, shoulderDy: 5.5, arm: 1.5, leg: 1.5, hand: 'fist', sleeve: 'none', face: [59, 50, 48, 39], head: 1.0 },
+  build: { rig: { k: 0.3008, chinY: 114, shoulderY: 107.8, hipY: 29.26, shoulderDx: -32.69, backShoulderDx: 28.73, backArm: true, weapon: { gripY: 0.5 }, headDx: 0.6828, legFDx: 12.58, legBDx: -14.04, footAnchorX: 0.006071, face: [109, 81, 50, 41], upperArm: 27.72, lowerArm: 18.48, handLen: 26.18, thigh: 8.163, shin: 8.163, torsoLen: 84.7, armOv: 6.632, legOv: 5.306 },       shoulderDx: -15.7, shoulderDy: 5.5, arm: 1.5, leg: 1.5, hand: 'fist', sleeve: 'none', face: [59, 50, 48, 39], head: 1.0 },
   weapon: { kind: 'mace', len: 78, grip: 0.34, shaft: '#5a4030', edge: '#d8a05c' }, // 混铁棍
   adorn: {
     // 腰间兽皮与铁链：短、重、甩得慢
