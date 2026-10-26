@@ -57,7 +57,7 @@ test('默认只探 head/torso，纸偶件不探（没换的人不为它们白付
 });
 
 test('打开纸偶模式才探 parts/ 下那一套，且路径带 parts/ 这一层', async () => {
-  allow = new Set(['head', 'torso', 'armFU', 'armFL', 'handF', 'legFU', 'legFL', 'footF']);
+  allow = new Set(['head', 'torso', 'armFU', 'armFL', 'handF', 'legFU', 'legFL', 'footF', 'weapon']);
   requested = [];
   globalThis.Image = FakeImage as unknown as typeof Image;
   setDollMode(true);
@@ -69,7 +69,12 @@ test('打开纸偶模式才探 parts/ 下那一套，且路径带 parts/ 这一�
       expect(requested.some(u => u.endsWith(`/parts/${n}.png`)),
         `纸偶模式开着却没探 parts/${n}.png`).toBe(true);
     }
-    for (const gone of ['armF', 'armB', 'legF', 'legB', 'weapon']) {
+    // 兵器（weapon）现在**是**管线生产的件了：画出来的那一张，切自 _raw/<id>_weapon.png，
+    // 挂在手上（兵器此前是程序化的几何——芭蕉扇那把看着像一张线框网）。
+    // 十二个人每人都有一件，照单全探不会多出 404。
+    expect(requested.some(u => u.endsWith('/parts/weapon.png')),
+      '纸偶模式开着却没探 parts/weapon.png——兵器会退回程序化那套').toBe(true);
+    for (const gone of ['armF', 'armB', 'legF', 'legB']) {
       expect(requested.some(u => u.endsWith(`/${gone}.png`)),
         `又在探测 ${gone}.png——那是管线明确不生产的部件，每个角色白付一个 404`).toBe(false);
     }

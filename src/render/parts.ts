@@ -45,9 +45,13 @@ export type PartImages = Partial<Record<PartName, PartImage>> & {
   doll?: DollParts;
 };
 
-/** 纸偶件那一套的部件名（与老的那套几乎不重叠，但头/躯干是同名的） */
+/** 纸偶件那一套的部件名（与老的那套几乎不重叠，但头/躯干是同名的）
+ *
+ * 兵器（weapon）也在这一张表里：它是**画出来的那一件**（切自 _raw/<id>_weapon.png），
+ * 挂在手上。十二个人每人都有一件，所以照单全探不会多出 404。 */
 export const DOLL_NAMES: PartName[] = [
   'head', 'torso', 'armFU', 'armFL', 'handF', 'legFU', 'legFL', 'footF',
+  'weapon',
 ];
 
 /** 远臂那一套（只有画里两条胳膊都画全了的角色才有）。

@@ -23,6 +23,7 @@ scripts/row-runs.py 的像素行数据校正）。衣摆下沿与踝是**自动�
 import json
 import math
 import os
+import re
 import sys
 
 import numpy as np
@@ -249,6 +250,73 @@ def trim_box(im, threshold=10):
     if len(ys) == 0:
         return (0, 0, im.size[0], im.size[1])
     return (int(xs.min()), int(ys.min()), int(xs.max()) + 1, int(ys.max()) + 1)
+
+
+def weapon_def_of(cid):
+    """角色数据里的 weapon: { kind, len, grip }。
+
+    为什么读数据文件而不另抄一份：握点与兵器长度是**玩法与画法共用的数**
+    （武器尖端要够到判定框前沿，靠的就是 len 与 grip）。抄一份就会漂——
+    判定按一份算、画按另一份画，差出来的就是"看着够不到人"。
+    """
+    path = os.path.join(ROOT, 'src', 'data', 'characters', f'{cid}.ts')
+    if not os.path.exists(path):
+        return None
+    src = open(path, encoding='utf-8').read()
+    m = re.search(
+        r"weapon:\s*\{[^}]*?kind:\s*'([a-z]+)'[^}]*?len:\s*([\d.]+)[^}]*?grip:\s*([\d.]+)",
+        src)
+    if not m:
+        return None
+    return {'kind': m.group(1), 'len': float(m.group(2)), 'grip': float(m.group(3))}
+
+
+def cut_weapon(cid, outdir):
+    """把画出来的那件兵器切出来，并量出握点。
+
+    为什么单独切：兵器此前是**程序化**的几何（扇子是一片平涂加三根深色扇骨，
+    看上去就是一张线框网）。身体已经改成「整人一张画、在关节处切开动」，
+    兵器这一头还留着程序化的画法，就是同一张画面上两种画法并存。
+
+    量什么：
+    - 握点的**横向**位置 = 角色数据里的 grip（从柄尾算起占整件兵器的比例），
+      握点横向只有一个出处，就是那份数据；
+    - 握点的**纵向**位置 = 那一列上不透明段的中点。柄的位置因兵器而异
+      （钉耙的柄在上、齿在下；扇柄在正中），只能量。
+    - 弓额外量两个弓弭（弦拉在两个弓弭之间）。
+    """
+    src = os.path.join(RAW, f'{cid}_weapon.png')
+    wdef = weapon_def_of(cid)
+    if not os.path.exists(src) or not wdef:
+        return None
+    im = load_clean(src, max_h=10 ** 6)
+    if not im.size[0] or not im.size[1]:
+        return None
+    # 兵器是横着的：按**最长边**压到 512（按高度压的话，长杆会变成一千多像素宽）
+    sc = 512 / max(im.size)
+    if sc < 1:
+        im = im.resize((max(1, int(im.size[0] * sc)), max(1, int(im.size[1] * sc))), Image.LANCZOS)
+    box = trim_box(im)
+    piece = im.crop(box)
+    w, h = piece.size
+    a = np.array(piece.getchannel('A'))
+
+    def span_mid(x):
+        ys = np.where(a[:, x] > 8)[0]
+        return (ys[0] + ys[-1]) / 2 if len(ys) else None
+
+    col = min(w - 1, max(0, int(round(wdef['grip'] * (w - 1)))))
+    gy = span_mid(col)
+    if gy is None:
+        return None
+    piece.save(os.path.join(outdir, 'weapon.png'))
+    geo = {'gripY': gy / max(1, h - 1)}
+    if wdef['kind'] == 'bow':
+        # 弓弭：左右各一列（弧的两端），弦就拉在它们之间
+        ay, by = span_mid(0), span_mid(w - 1)
+        if ay is not None and by is not None:
+            geo['tips'] = [[0.0, ay / max(1, h - 1)], [1.0, by / max(1, h - 1)]]
+    return geo
 
 
 def apply_mask(im, mask):
@@ -528,6 +596,12 @@ def cut_one(cid, spec, verbose=True):
         pw = tb[2] - tb[0]
         ph = tb[3] - tb[1]
         rig[name] = {'w': pw * k, 'h': ph * k}
+
+    # ---- 兵器件：画出来的那一张（不是程序化的几何）--------------------------
+    # 它不占 rig[name]（那一张是身体各块的尺寸），握点与弓弭另记。
+    wgeo = cut_weapon(cid, outdir)
+    if wgeo:
+        rig['weapon'] = wgeo
 
     # 关节高度（离地，逻辑单位）：脚底为 0
     def above(pct):

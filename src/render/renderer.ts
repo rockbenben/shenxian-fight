@@ -1922,8 +1922,26 @@ function drawDollLimbs(
   // 长度**不**按手臂比例缩：兵器的长度跟着判定框走（autoWeaponScale），
   // 缩短了就够不到人（玩法的真值在这头）。
   if (weapon) {
-    drawWeapon(ctx, fElbow, fHand, weapon, white, weaponScale, weaponGlow,
-      weapon.kind === 'bow' ? bHand : undefined);
+    const wpn = doll.weapon;
+    if (wpn && rig.weapon) {
+      // 画出来的那件兵器：握点是支点，整张图绕着它甩到前臂的方向上。
+      // 没有兵器贴图的角色（件没到位）仍走程序化那条，兜底不变。
+      const wdx = fHand[0] - fElbow[0], wdy = fHand[1] - fElbow[1];
+      const wL = Math.hypot(wdx, wdy) || 1;
+      drawWeaponImage(
+        ctx, fHand, wdx / wL, wdy / wL, wpn, weapon.len * weaponScale,
+        weapon.grip, rig.weapon.gripY, fc, white, weaponGlow, weapon.edge,
+        // 弓是**竖着握**的：弓臂上下立着、弓弦在身后那条线上，不跟着前臂转。
+        // 跟着前臂转的话，手垂在体侧时弓就横在腰上——那不是弓，是一根弯棍。
+        // 所以弓走「绝对朝向」那一支（absolute），其余兵器顺着前臂伸出去。
+        weapon.kind === 'bow' ? -Math.PI / 2 : 0,
+        weapon.kind === 'bow',
+        rig.weapon.tips, weapon.kind === 'bow' ? bHand : undefined,
+      );
+    } else {
+      drawWeapon(ctx, fElbow, fHand, weapon, white, weaponScale, weaponGlow,
+        weapon.kind === 'bow' ? bHand : undefined);
+    }
   }
 
   seg(ctx, a.nshX, a.nshY, p.armF[0], upperArm, segHalfW(armFU), 0, fc, '', armFU, white, upExt, armOv);
@@ -2457,6 +2475,70 @@ export function drawWeapon(
     ctx.fillStyle = solid(ballGrad(ctx, mx, my, 11, edge));   // 锤头是球面，平涂就是个贴片
     ctx.fill();
     ctx.strokeStyle = outline(edge); ctx.lineWidth = 1.5; ctx.stroke();
+  }
+}
+
+/**
+ * 画出来的那件兵器：切自 _raw/<id>_weapon.png 的贴图，挂在手上。
+ *
+ * 为什么不再走程序化：身体已经是「整人一张画、在关节处切开动」，兵器若是几何画出来的，
+ * 同一张画面上就是两种画法并存。芭蕉扇那把尤其明显——一片平涂的叶面加三根深色扇骨，
+ * 远看就是一张线框网。
+ *
+ * 挂法：握点是支点。图片是**横着**的（柄在左、刃在右），所以这里把整张图绕着握点
+ * 转到前臂的方向上；换边（fc<0）时整张镜像——只转不镜像的话，剑刃的方向会在换边时反掉。
+ *
+ * `mount` 是兵器自身的轴与前臂的夹角：弓走 absolute（竖着立，不跟手转），
+ * 其余顺着前臂伸出去。`tips` 是弓的两个弓弭（弦拉在它们之间）；
+ * 拉满时弦汇到拉弦的那只手上。
+ */
+function drawWeaponImage(
+  ctx: CanvasRenderingContext2D, hand: [number, number], ux: number, uy: number,
+  part: PartImage, len: number, gripX: number, gripY: number,
+  fc: number, white: boolean, glow: number, edge: string,
+  mount: number, absolute: boolean,
+  tips?: [[number, number], [number, number]], pull?: [number, number],
+): void {
+  const sw = part.right - part.left, sh = part.bottom - part.top;
+  if (!(sw > 0 && sh > 0)) return;
+  const s = len / sw;              // 逻辑单位 / 图片像素：整件兵器的长度就是 len
+  const gx = gripX * sw * s;      // 握点：沿全长（从柄尾算起）的位置
+  const gy = gripY * sh * s;
+  const ang = Math.atan2(uy, ux);
+  // 朝向：absolute 的兵器（弓）不跟手转；其余顺着前臂，换边时取镜像后的方向。
+  const phi = absolute ? mount : (fc >= 0 ? ang + mount : ang - mount);
+  const k = fc < 0 ? -1 : 1;
+  const c = Math.cos(phi), sn = Math.sin(phi);
+  // 图上某一点（内容框里的比例 fx,fy）在屏幕上的位置
+  const toScreen = (fx: number, fy: number): [number, number] => {
+    const lx = sw * s * (fx - gripX), ly = sh * s * (fy - gripY);
+    return [hand[0] + lx * c - k * ly * sn, hand[1] + lx * sn + k * ly * c];
+  };
+  ctx.save();
+  ctx.translate(hand[0], hand[1]);
+  ctx.rotate(phi);
+  if (fc < 0) ctx.scale(1, -1);
+  if (glow > 0) {                  // 大招期间刃身发光：叠一道同色的外辉
+    ctx.shadowColor = edge;
+    ctx.shadowBlur = 10 * Math.min(glow, 1);
+  }
+  if (white) drawWhitePart(ctx, part, part.left, part.top, sw, sh, -gx, -gy, sw * s, sh * s);
+  else ctx.drawImage(part.img, part.left, part.top, sw, sh, -gx, -gy, sw * s, sh * s);
+  ctx.shadowBlur = 0;
+  ctx.restore();
+  // 弓弦画在贴图之外：拉满时弦要汇到拉弦的那只手上，贴图里没有这一笔。
+  if (tips) {
+    const t1 = toScreen(tips[0][0], tips[0][1]);
+    const t2 = toScreen(tips[1][0], tips[1][1]);
+    ctx.save();
+    ctx.strokeStyle = white ? '#fff' : edge;
+    ctx.lineWidth = 1.6;
+    ctx.beginPath();
+    ctx.moveTo(t1[0], t1[1]);
+    if (pull) ctx.lineTo(pull[0], pull[1]);
+    ctx.lineTo(t2[0], t2[1]);
+    ctx.stroke();
+    ctx.restore();
   }
 }
 

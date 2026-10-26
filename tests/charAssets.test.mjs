@@ -19,7 +19,7 @@ test('public/chars 里的每个文件都在探测列表内，且命名合规', (
   // 远臂那三件（armBU/armBL/handB）只有画里两条胳膊都画全了的角色才有，
   // 按角色有没有（rig.backArm）来探——其余角色探了就是必然 404。
   const DOLL_PROBED = ['head', 'torso', 'armFU', 'armFL', 'handF', 'legFU', 'legFL', 'footF',
-    'armBU', 'armBL', 'handB', 'tail', 'wing'];
+    'armBU', 'armBL', 'handB', 'tail', 'wing', 'weapon'];
   const root = 'public/chars';
   expect(fs.existsSync(root), 'public/chars 不见了').toBe(true);
 
@@ -78,4 +78,32 @@ test('远臂件与角色的 backArm 标记一一对应', () => {
     }
   }
   expect(bad, `远臂件与 backArm 标记对不上：\n${bad.join('\n')}`).toEqual([]);
+});
+
+// 兵器件：**每个人都要有**。
+//
+// 兵器此前是程序化的几何——芭蕉扇那把是一片平涂加三根深色扇骨，远看就是一张线框网；
+// 身体已经是「整人一张画、在关节处切开动」，兵器这一头还留着程序化画法，
+// 就是同一张画面上两种画法并存。现在兵器也画出来（_raw/<id>_weapon.png → parts/weapon.png），
+// 挂在手上。
+//
+// 这里守两件事：① 每个人都有这件兵器（少一个就有人悄悄退回程序化那套）；
+// ② rig 里量好的握点也在（握点没了，兵器就不知道该挂在手心还是挂在手背上）。
+test('每人都有画出来的兵器，且握点量好了', () => {
+  const root = 'public/chars';
+  const charsDir = 'src/data/characters';
+  const bad = [];
+  for (const id of fs.readdirSync(root)) {
+    const dir = path.join(root, id);
+    if (!fs.statSync(dir).isDirectory()) continue;
+    const p = path.join(dir, 'parts', 'weapon.png');
+    if (!fs.existsSync(p)) { bad.push(`${id}: 没有 parts/weapon.png——兵器会退回程序化那套`); continue; }
+    const src = path.join(charsDir, `${id}.ts`);
+    if (!fs.existsSync(src)) continue;
+    const text = fs.readFileSync(src, 'utf8');
+    if (!/weapon:\s*\{\s*gripY:/.test(text)) {
+      bad.push(`${id}: rig 里没有兵器的握点（weapon: { gripY }）——兵器不知道往哪儿挂`);
+    }
+  }
+  expect(bad, `兵器件与 rig 对不上：\n${bad.join('\n')}`).toEqual([]);
 });

@@ -1,0 +1,66 @@
+{
+  "style": "Flat vector illustration, thick dark outline, cel shaded, Chinese mythology magical weapon artefact. Flat blocks of solid color with hard edges — no soft gradients, no airbrush shading, no fine cross-hatching, not semi-realistic. Plain flat solid magenta #FF00FF background. Absolutely no text, no letters, no words, no captions, no watermark, no signature anywhere in the image.",
+  "contract": " A single weapon alone in the picture, one subject only: no person, no hand, no arm, nothing but the weapon itself. The weapon lies HORIZONTALLY across the picture, its short handle at the far LEFT and its business end pointing to the RIGHT. The whole weapon is fully visible, nothing cropped, centred in the frame with a small margin all around. The silhouette is clear and readable against the flat background.",
+  "items": [
+    {
+      "id": "nezha",
+      "ratio": "16:9",
+      "desc": " The weapon is a fire-tipped spear: a long red-brown wooden shaft, a golden collar ring near the middle, and at the RIGHT end a long flame-shaped blade in orange and gold with two small curling flame wisps."
+    },
+    {
+      "id": "honghaier",
+      "ratio": "16:9",
+      "desc": " The weapon is a fire-tipped spear: a long dark red-brown wooden shaft, a golden collar ring, and at the RIGHT end a long flame-shaped blade in orange and gold."
+    },
+    {
+      "id": "wukong",
+      "ratio": "16:9",
+      "desc": " The weapon is a solid golden cudgel: a thick straight golden rod, slightly thicker at the middle, with a bright gold cap and a red-gold band at each end."
+    },
+    {
+      "id": "tieshan",
+      "ratio": "4:3",
+      "desc": " The weapon is a banana-leaf fan: a short slender dark-green handle at the LEFT, and at the RIGHT a very broad fan-shaped leaf, deep teal green, its surface divided by many pale-green ribs that radiate out from the handle, the outer edge of the leaf broad and gently scalloped."
+    },
+    {
+      "id": "houyi",
+      "ratio": "16:9",
+      "desc": " The weapon is a war bow stave: one long deep semicircular arc of dark polished brown wood lying horizontally like a smile, its two tips at the far left and the far right at the same height, the arc curving down a long way in the middle where it is bound with orange-gold leather bands. The grip is at the lowest point of the arc, midway between the two tips."
+    },
+    {
+      "id": "niumo",
+      "ratio": "16:9",
+      "desc": " The weapon is an iron club: a thick straight dark iron rod with a heavy blunt rounded head at the RIGHT end, warm golden-brown highlights on the metal."
+    },
+    {
+      "id": "leizhen",
+      "ratio": "16:9",
+      "desc": " The weapon is a steel war club: a thick straight blue-steel rod with a heavy blunt rounded head at the RIGHT end, pale blue highlights along the metal."
+    },
+    {
+      "id": "bajie",
+      "ratio": "16:9",
+      "desc": " The weapon is a nine-tooth rake: a long dark wooden shaft, and at the RIGHT end a horizontal cross bar with nine short flat iron teeth pointing to the right."
+    },
+    {
+      "id": "erlang",
+      "ratio": "16:9",
+      "desc": " The weapon is a three-pointed two-edged blade: a long steel-blue shaft, and at the RIGHT end a long pale-silver central blade with a shorter point on each side of it."
+    },
+    {
+      "id": "xingtian",
+      "ratio": "4:3",
+      "desc": " The weapon is a great battle axe: a dark wooden shaft, and at the RIGHT end a broad curved steel blade with a golden edge on the upper side and a short spike on the lower side."
+    },
+    {
+      "id": "zhongkui",
+      "ratio": "16:9",
+      "desc": " The weapon is a judge's sword: a straight pale steel blade at the RIGHT end, a dark purple hilt and a short cross guard, and a red tassel hanging from the guard."
+    },
+    {
+      "id": "baigu",
+      "ratio": "16:9",
+      "desc": " The weapon is a short bone sword: a straight pale ivory blade at the RIGHT end shaped from a long animal bone, with a rough bone hilt and a bone knob at the pommel."
+    }
+  ]
+}
