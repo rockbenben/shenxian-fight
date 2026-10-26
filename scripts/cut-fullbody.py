@@ -340,6 +340,80 @@ def crop_pct(im, x0, y0, x1, y1):
     return im.crop(box)
 
 
+def polyline_at(pl, y_pct):
+    """折线上在给定高度处的 x（线性插值；两端取端点值）。
+
+    折线是 [[y%, x%], ...]。规格表里的界线**由人读画定**（这一路的规矩：
+    矩形只是切件框，界线由画自己的界决定，工具只做校验），
+    这里只负责把那条界插值成逐行的位置。"""
+    if not pl:
+        return None
+    if y_pct <= pl[0][0]:
+        return pl[0][1]
+    if y_pct >= pl[-1][0]:
+        return pl[-1][1]
+    for i in range(len(pl) - 1):
+        y0, x0 = pl[i][0], pl[i][1]
+        y1, x1 = pl[i + 1][0], pl[i + 1][1]
+        if y0 <= y_pct <= y1:
+            t = 0 if y1 == y0 else (y_pct - y0) / (y1 - y0)
+            return x0 + (x1 - x0) * t
+    return pl[-1][1]
+
+
+def clip_torso_edges(piece, spec, crop_x0_px, W):
+    """把躯干那一块的左右缘按**画上的界**逐行裁掉（不是矩形的一条竖边）。
+
+    为什么：手臂那一侧，画上身体与手臂之间那条界是**随高度变的曲线**；
+    矩形切只能给一条竖直线，于是摆臂时那道竖边就露在体侧（画面上多出一条直边）。
+    规格表里写 torsoL / torsoR（[[y%, x%], ...]）就是那条界。
+
+    坐标相对**整幅**的百分比，裁件时要把裁切框的左缘换算掉。"""
+    if 'torsoL' not in spec and 'torsoR' not in spec and 'armR' not in spec:
+        return piece
+    a = np.array(piece.getchannel('A'))
+    h, w = a.shape
+    y0, y1 = spec['chin'], spec['hip']
+    # 躯干的左缘：优先用 torsoL；没有就拿 armR（近臂与躯干之间那条界）。
+    left_pl = spec.get('torsoL') or spec.get('armR')
+    for i in range(h):
+        ypct = y0 + (i + 0.5) / h * (y1 - y0)
+        lx = polyline_at(left_pl, ypct)
+        rx = polyline_at(spec.get('torsoR'), ypct)
+        if lx is not None:
+            c = int(round(W * lx / 100 - crop_x0_px))
+            a[:, :max(0, min(w, c))] = 0
+        if rx is not None:
+            c = int(round(W * rx / 100 - crop_x0_px))
+            a[:, max(0, min(w, c)):] = 0
+    piece.putalpha(Image.fromarray(a))
+    return piece
+
+
+def clip_arm_edge(piece, pl, by0_px, by1_px, H, crop_x0_px, W, side='R'):
+    """把一段肢体（手臂）的一缘按折线逐行裁掉。
+
+    这条折线是**手臂与躯干之间那条界**：手臂件裁到它、躯干件也从它开始，
+    两块就严丝合缝地拼上——摆臂时躯干上不会多出一条直边，手臂上也不会
+    带着一条跟着飞的躯干像素。
+
+    side='R' 裁右缘（近臂与躯干之间那条界），side='L' 裁左缘（远臂与躯干之间那条界）。"""
+    a = np.array(piece.getchannel('A'))
+    h, w = a.shape
+    for i in range(h):
+        ypct = (by0_px + (i + 0.5)) / H * 100
+        rx = polyline_at(pl, ypct)
+        if rx is None:
+            continue
+        c = int(round(W * rx / 100 - crop_x0_px))
+        if side == 'R':
+            a[:, max(0, min(w, c)):] = 0
+        else:
+            a[:, :max(0, min(w, c))] = 0
+    piece.putalpha(Image.fromarray(a))
+    return piece
+
+
 def cut_one(cid, spec, verbose=True):
     src = os.path.join(RAW, f'{cid}_full.png')
     if not os.path.exists(src):
@@ -389,9 +463,16 @@ def cut_one(cid, spec, verbose=True):
             spec['ankle'] = spec_ankle
         # 膝盖取腿中点（画里腿几乎是直的，中点就是膝盖）
         spec['knee'] = (spec['hip'] + spec['ankle']) / 2
-        # 脚那一块的横向：踝两侧各留一点
-        leg0, leg1 = spec['leg']
-        spec['foot'] = [max(0, leg0 - 3), min(100, leg1 + 3)]
+        # 脚那一块的横向：踝两侧各留一点。
+        #
+        # **规格表里写了 footBox 就用它**：腿整个被袍子盖住的角色（白骨精那一版），
+        # 腿那一块必须切在空处——否则腿上会带着一只脚，腿一摆就甩出一块楔子；
+        # 而脚那一块要单独框住那两只脚。两者没法从同一条腿推出来，所以分开写。
+        if 'footBox' in spec:
+            spec['foot'] = list(spec['footBox'])
+        else:
+            leg0, leg1 = spec['leg']
+            spec['foot'] = [max(0, leg0 - 3), min(100, leg1 + 3)]
         print(f'  衣摆 {spec["hip"]:.1f}%  膝 {spec["knee"]:.1f}%  踝 {spec["ankle"]:.1f}%')
 
     # 身体中轴：躯干裁切框的中心。手臂切线要靠它认出「紧挨躯干的那一段」
@@ -488,10 +569,16 @@ def cut_one(cid, spec, verbose=True):
     pieces = {}
     # 每一段在下一个关节往下多留 arm_ov（关节重叠，见上面的说明）
     arm_ends = {'armFU': spec['elbow'] + arm_ov, 'armFL': spec['wrist'] + arm_ov}
+    # 近臂与躯干之间那条界（画上的界，逐行）：手臂件裁到它、躯干件也从它开始。
+    armR = spec.get('armR')
+    armR_max = max((p[1] for p in armR), default=None) if armR else None
     for name, y0, y1, xr in arm_segs:
         # 横向范围仍按**原来那一段**量（重叠那截在关节之下，不参与测量）
         if not spec.get('armOverride'):
             xr = arm_x_range(y0, y1, xr)
+        if armR_max is not None:
+            # 裁切框要够宽，折线才能在里面裁（否则手臂右缘多出来的部分切不掉）
+            xr = [xr[0], max(xr[1], armR_max + 1)]
         by1 = min(H, int(round(H * arm_ends.get(name, y1) / 100)))
         # 裁切框与掩码切片必须用同一组整数，否则差一像素（掩码对不上，apply_mask 直接抛）
         bx0 = max(0, int(round(W * xr[0] / 100)))
@@ -500,6 +587,8 @@ def cut_one(cid, spec, verbose=True):
         piece = im.crop((bx0, by0, max(bx0 + 1, bx1), max(by0 + 1, by1)))
         if arm_mask is not None:
             piece = apply_mask(piece, arm_mask[by0:by1, bx0:bx1])
+        if armR:
+            piece = clip_arm_edge(piece, armR, by0, max(by0 + 1, by1), H, bx0, W)
         pieces[name] = piece
 
     # ---- 远侧手臂（画面右那条）：单独切一套 ---------------------------------
@@ -526,7 +615,15 @@ def cut_one(cid, spec, verbose=True):
                  ('armBL', spec['elbow'], spec['wrist'] + arm_ov, band_x(1)),
                  ('handB', spec['wrist'], spec['handEnd'], band_x(2))]
         for name, y0, y1, xr in bsegs:
-            pieces[name] = crop_pct(im, xr[0], y0, xr[1], y1)
+            piece = crop_pct(im, xr[0], y0, xr[1], y1)
+            if 'torsoR' in spec:
+                # 远臂的左缘按**画上的界**裁：它与躯干之间那条界随高度变，
+                # 切矩形就会在远臂那一侧留下一条竖直的边。
+                bx0 = int(round(W * xr[0] / 100))
+                by0 = int(round(H * y0 / 100))
+                by1 = int(round(H * y1 / 100))
+                piece = clip_arm_edge(piece, spec['torsoR'], by0, by1, H, bx0, W, 'L')
+            pieces[name] = piece
 
     # ---- 身后的附属件（尾巴 / 翅膀）------------------------------------------
     # 悟空的尾巴、雷震子的翅膀在画里是**独立的一块**（与身体、手臂之间有一道背景缝），
@@ -568,6 +665,10 @@ def cut_one(cid, spec, verbose=True):
         arr[max(0, ky):, min(arr.shape[1], kx1):] = 0
         pieces['head'].putalpha(Image.fromarray(arr))
     pieces['torso'] = crop_pct(im, spec['torso'][0], spec['chin'], spec['torso'][1], spec['hip'])
+    # 躯干的左右缘按画上的界逐行裁（规格表里的 torsoL / torsoR）——
+    # 矩形切出来的是一条竖边，手臂那一侧画上的界却是条随高度变的曲线。
+    pieces['torso'] = clip_torso_edges(
+        pieces['torso'], spec, W * spec['torso'][0] / 100, W)
     # 腿同样留关节重叠：膝盖弯起来时两块之间也会裂开一道缝（姿势里膝弯 40°）。
     # 脚那一块不往上留——脚的贴图是**以踝为锚**画的（见 renderer 的 drawDollFoot），
     # 往上留会让整只脚沉到地里去；踝那里本来几乎不弯（差 8°），缝本来就看不见。

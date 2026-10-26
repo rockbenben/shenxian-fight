@@ -77,6 +77,21 @@ def main():
         # ---- 2/3. 躯干与手臂的横向互相越界 ---------------------------------
         arm0, arm1 = sp.get('armFU', sp['arm'])
         tor0, tor1 = sp['torso']
+        # 躯干的左缘若是按画上的界逐行走的（torsoL / armR），矩形那个 tor0 就不作数了：
+        # 体检取**腕那一行**上的那条界——近臂与躯干就是在那一行上分开的。
+        pl = sp.get('torsoL') or sp.get('armR')
+        if pl:
+            yy = sp['wrist']
+            if yy <= pl[0][0]:
+                tor0 = pl[0][1]
+            elif yy >= pl[-1][0]:
+                tor0 = pl[-1][1]
+            else:
+                for i in range(len(pl) - 1):
+                    if pl[i][0] <= yy <= pl[i + 1][0]:
+                        t = (yy - pl[i][0]) / max(1e-6, (pl[i + 1][0] - pl[i][0]))
+                        tor0 = pl[i][1] + (pl[i + 1][1] - pl[i][1]) * t
+                        break
         # 允许 ≤4% 的重叠：那一段是**三角肌**（肩上的肌肉），
         # 它本来就同时属于肩与手臂，躯干从腋下开始、手臂带着三角肌。
         if arm1 > tor0 + 4:
