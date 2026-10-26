@@ -14,6 +14,7 @@ import json
 import os
 import sys
 
+import numpy as np
 from PIL import Image
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -73,7 +74,37 @@ def main():
         bg.paste(art_rgb, (off_x, off_y))
         bg = Image.blend(cell, bg, 0.62)
         bg.save(os.path.join(OUT, f'{cid}.png'))
-        print(f'{cid}: 原画 {AW}x{AH} 叠上去了（横移 {off_x} 纵移 {off_y}）')
+
+        # ---- 逐像素差分：原画里有、纸偶上却没有的像素 = **丢了的身体** ---------
+        # 这一条比眼睛可靠：躯干右缘那一块（身体与远臂之间、裙摆的右边）
+        # 若切漏了，原画那一块有像素而纸偶上没有——叠图上只是一条窄边，
+        # 缩到拼版里根本看不出来，但像素数会把它算出来。
+        src_mask = np.array(art.getchannel('A')) > 8
+        cell_arr = np.array(cell.convert('RGB')).astype(int)
+        # 背景色**取格子的实际角落色**：写死一个近似值会让整个背景都算进「纸偶」，
+        # 差分就成了零（背景与实际色差 14，阈值 12 刚好把它算进去）。
+        bg_col = cell_arr[2, 2].copy()
+        doll_mask = (np.abs(cell_arr - bg_col).max(axis=2) > 18)
+        # 把原画贴到格子里的同一位置
+        full = np.zeros(cell_arr.shape[:2], bool)
+        x0, y0 = max(0, off_x), max(0, off_y)
+        w = min(art.size[0], cell_arr.shape[1] - x0)
+        h = min(art.size[1], cell_arr.shape[0] - y0)
+        if w > 0 and h > 0:
+            full[y0:y0 + h, x0:x0 + w] = src_mask[:h, :w]
+        lost = int((full & ~doll_mask).sum())
+        # 换算成源图像素（叠图是放大过的）
+        lost_src = lost / max(1e-6, (FIG_H * DPR) / AH) ** 2
+        # 把丢掉的像素**标红**画出来：数字只说丢了多少，红点说丢在哪儿
+        mark = bg.copy()
+        m = np.array(mark)
+        lost_mask = full & ~doll_mask
+        if lost_mask.any():
+            m[lost_mask] = (220, 0, 0)
+            mark = Image.fromarray(m)
+            mark.save(os.path.join(OUT, f'{cid}-lost.png'))
+        print(f'{cid}: 原画 {AW}x{AH} 叠上去了（横移 {off_x} 纵移 {off_y}）'
+              f'｜原画有而纸偶没有：{lost} 屏幕像素（约 {lost_src:.0f} 源像素）')
 
 
 if __name__ == '__main__':
