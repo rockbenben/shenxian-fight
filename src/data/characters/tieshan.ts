@@ -62,7 +62,7 @@ export const TIESHAN: CharacterDef = {
   // 头身比：内容框 92×123、脸 60×69（源像素，量的——工具见 scripts/measure-heads.py）——
   // 高髻把头顶撑高，她的脸反而占了大半张脸。
   // 归一只用一条锚（内容盒高 = 头高），脸只管横向挂点与下巴接缝。
-  build: { rig: { k: 0.3008, chinY: 117, shoulderY: 110.9, hipY: 15.4, shoulderDx: -12.52, backShoulderDx: 17.22, backArm: true, weapon: { gripY: 0.5 }, torsoAnchorX: 13.06, headDx: -1.287, legFDx: 0, legBDx: 0, footAnchorX: 0.2425, face: [36, 63, 65, 60], upperArm: 29.26, lowerArm: 15.4, handLen: 12.32, thigh: 3.339, shin: 3.339, torsoLen: 101.6, armOv: 2.386, legOv: 2.763 },          shoulderDx: -15.8, shoulderDy: 4.4, arm: 0.8, leg: 0.85, hand: 'fist', sleeve: 'cuff', face: [49, 38, 60, 69], head: 1.0 },
+  build: { rig: { k: 0.3008, chinY: 117, shoulderY: 110.9, hipY: 15.4, shoulderDx: -12.52, backShoulderDx: 17.22, backArm: true, weapon: { gripY: 0.5 }, torsoAnchorX: 13.06, headDx: -1.287, legFDx: 0, legBDx: 0, footAnchorX: 0.2425, face: [36, 63, 65, 60], upperArm: 29.26, lowerArm: 15.4, handLen: 12.32, thigh: 3.339, shin: 3.339, torsoLen: 101.6, armOv: 2.386, legOv: 2.763 }, shoulderDx: -15.8, shoulderDy: 4.4, arm: 0.8, leg: 0.85, hand: 'fist', sleeve: 'cuff', face: [49, 38, 60, 69], head: 1.0 },
   // 芭蕉扇：全场唯一不靠杆长吃饭的兵器——扇面是**横着张开**的，攻程来自风不是杆
   weapon: { kind: 'fan', len: 62, grip: 0.22, shaft: '#5a7a6a', edge: '#eef3ea' },
   adorn: {
